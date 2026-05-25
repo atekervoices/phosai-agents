@@ -7,8 +7,8 @@ references from agent config dictionaries.
 import re
 from typing import Any
 
-# Matches  secret("provider_name")  or  secret('provider_name')
-_SECRET_RE = re.compile(r'secret\(["\']([^"\']+)["\']\)')
+# Matches  secret("provider_name")  or  secret ( 'provider_name' )
+_SECRET_RE = re.compile(r'secret\s*\(\s*["\']([^"\']+)["\']\s*\)')
 
 
 def extract_secret_keys(config: dict[str, Any]) -> set[str]:
