@@ -227,7 +227,7 @@ impl TtsStreamingProvider for CartesiaWsTtsProvider {
         Ok(())
     }
 
-    async fn send_text(&mut self, text: &str, context_id: &str) {
+    async fn send_text(&mut self, text: &str, context_id: &str, _is_last: bool) {
         let Some(tx) = &self.conn_msg_tx else { return };
         if self.voice_id.is_empty() || self.voice_id == "default" {
             warn!("[cartesia-ws-tts] No voice_id configured — skipping send_text");

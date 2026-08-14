@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { formatDuration } from "./types";
 
 function isLikelyOpusUrl(url: string): boolean {
-  return /\.opus(\?|$)/i.test(url) || /audio_format=opus/i.test(url);
+  return /\.opus(\?|$)/i.test(url) || /audio_format=opus/i.test(url) || /\/recording(\?|$)/i.test(url);
 }
 
 function supportsOpusPlayback(): boolean {

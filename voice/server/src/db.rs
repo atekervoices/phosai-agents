@@ -527,23 +527,49 @@ async fn agent_config_for_id(
         }
     }
 
+    let llm_key = {
+        let k = llm.resolved_api_key(engine);
+        if k.is_empty() {
+            std::env::var("OPENAI_API_KEY")
+                .or_else(|_| std::env::var("LLM_API_KEY"))
+                .unwrap_or_default()
+        } else {
+            k
+        }
+    };
+    let llm_provider = if llm.provider.is_empty() {
+        std::env::var("LLM_PROVIDER").unwrap_or_else(|_| "openai".to_string())
+    } else {
+        llm.provider.clone()
+    };
+    let llm_model = if llm.model.is_empty() {
+        std::env::var("LLM_MODEL").unwrap_or_else(|_| "gpt-4o".to_string())
+    } else {
+        llm.model.clone()
+    };
+    let llm_base_url = if llm.base_url.is_empty() {
+        std::env::var("LLM_BASE_URL").unwrap_or_else(|_| "https://api.openai.com/v1".to_string())
+    } else {
+        llm.base_url.clone()
+    };
+
     Some(AgentConfig {
         agent_id: agent_id.to_string(),
         agent_graph,
         escalation_destinations,
-        llm_provider: llm.provider.clone(),
-        llm_model: llm.model.clone(),
-        llm_base_url: llm.base_url.clone(),
-        llm_api_key: llm.resolved_api_key(engine),
-        stt_provider: stt.provider.clone(),
-        stt_model: stt.model.clone(),
-        stt_base_url: stt.base_url.clone(),
+        llm_provider,
+        llm_model,
+        llm_base_url,
+        llm_api_key: llm_key,
+        stt_provider: if stt.provider.is_empty() { std::env::var("STT_PROVIDER").unwrap_or_else(|_| "phosai-stt".to_string()) } else { stt.provider.clone() },
+        stt_model: if stt.model.is_empty() { std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-realtime".to_string()) } else { stt.model.clone() },
+        stt_base_url: if stt.base_url.is_empty() { std::env::var("STT_BASE_URL").unwrap_or_else(|_| "ws://control.atekervoices.com/control".to_string()) } else { stt.base_url.clone() },
         stt_api_key: stt.resolved_api_key(engine),
-        tts_provider: tts.provider.clone(),
-        tts_model: tts.model.clone(),
-        tts_base_url: tts.base_url.clone(),
+        tts_provider: if tts.provider.is_empty() { std::env::var("TTS_PROVIDER").unwrap_or_else(|_| "phosai-ws".to_string()) } else { tts.provider.clone() },
+        tts_model: if tts.model.is_empty() { std::env::var("TTS_MODEL").unwrap_or_else(|_| "spark-tts".to_string()) } else { tts.model.clone() },
+        tts_base_url: if tts.base_url.is_empty() { std::env::var("TTS_BASE_URL").unwrap_or_else(|_| "https://tts.atekervoices.com".to_string()) } else { tts.base_url.clone() },
         tts_api_key: tts.resolved_api_key(engine),
-        tts_voice_id: tts.voice_id.clone(),
+        tts_voice_id: if tts.voice_id.is_empty() { std::env::var("TTS_VOICE_ID").unwrap_or_else(|_| "pcm_female_1".to_string()) } else { tts.voice_id.clone() },
         native_multimodal_model: native_multimodal.model.clone(),
         native_multimodal_api_key: native_multimodal.resolved_api_key(engine),
     })
@@ -587,6 +613,10 @@ async fn fetch_providers_bulk(
             let p_type: String = row.try_get("provider_type").unwrap_or_default();
             let config_val: serde_json::Value = row.try_get("config_json").unwrap_or_default();
             if let Ok(cfg) = serde_json::from_value::<ProviderConfigJson>(config_val) {
+                debug!(
+                    "fetch_providers_bulk: resolved {p_type} — provider={:?}, base_url={:?}, model={:?}",
+                    cfg.provider, cfg.base_url, cfg.model
+                );
                 map.insert(p_type, cfg);
             }
         }

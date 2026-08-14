@@ -24,6 +24,7 @@ const navItems = [
     icon: CallInternal02Icon,
   },
   { href: "/dashboard/integrations", label: "Integrations", icon: ConnectIcon },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings01Icon },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -73,37 +74,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               );
             })}
-            <div className="hidden in-[.open-source]:block">
-              <Link
-                href={getNavHref("/settings")}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  pathname === getNavHref("/settings")
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground hover:bg-sidebar-muted hover:text-sidebar-accent-foreground"
-                }`}
-              >
-                <HugeiconsIcon
-                  icon={Settings01Icon}
-                  className={`size-4 ${pathname === getNavHref("/settings") ? "text-primary" : "text-sidebar-muted-foreground"}`}
-                />
-                Settings
-              </Link>
-            </div>
           </div>
         </nav>
 
-        {/* Bottom */}
-        <div className="p-3 space-y-1">
-          <Link
-            href={DOCS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-sidebar-foreground hover:bg-sidebar-muted hover:text-sidebar-accent-foreground transition-colors"
-          >
-            <HugeiconsIcon icon={HelpCircleIcon} className="size-4 text-sidebar-muted-foreground" />
-            Docs
-          </Link>
-        </div>
+
       </aside>
 
       {/* Main */}

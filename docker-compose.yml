@@ -11,7 +11,7 @@ name: feros-voice-agent-os
 services:
   # PostgreSQL Database
   db:
-    image: postgres:18-alpine
+    image: postgres:15-alpine
     environment:
       POSTGRES_USER: voice-agent-os
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ferosdev}
@@ -29,13 +29,18 @@ services:
 
   # Python Backend (FastAPI)
   studio-api:
-    image: ghcr.io/ferosai/feros-studio-api:${IMAGE_TAG:-latest}
+    image: feros-studio-api:local
+    build:
+      context: .
+      dockerfile: studio/api/Dockerfile
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     environment:
       DATABASE__URL: ${DATABASE__URL:-postgresql://voice-agent-os:${POSTGRES_PASSWORD:-ferosdev}@db:5432/${POSTGRES_DB:-voice_agent}}
       AUTH__SECRET_KEY: ${AUTH__SECRET_KEY:-n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s=}
       ENVIRONMENT: development
+      OPENAI_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      LLM_API_KEY: ${LLM_API_KEY:-}
     volumes:
       - ./studio/api:/app
       - recordings:/recordings
@@ -47,31 +52,46 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 60s
     command: >
       sh -c "alembic upgrade head &&
-             python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+             python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   # Rust Voice Server (telephony gateway + WebRTC)
   voice-server:
-    image: ghcr.io/ferosai/feros-voice-server:${IMAGE_TAG:-latest}
+    image: feros-voice-server:local
+    build:
+      context: .
+      dockerfile: voice/server/Dockerfile
     ports:
-      - "127.0.0.1:8300:8300"
-      - "127.0.0.1:50000:50000/udp"
+      - "8300:8300"
+      - "50000:50000/udp"
     environment:
       DATABASE__URL: ${DATABASE__URL:-postgresql://voice-agent-os:${POSTGRES_PASSWORD:-ferosdev}@db:5432/${POSTGRES_DB:-voice_agent}}
       AUTH__SECRET_KEY: ${AUTH__SECRET_KEY:-n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s=}
       SERVER__LISTEN_HOST: 0.0.0.0
       SERVER__LISTEN_PORT: 8300
       WEBRTC__UDP_PORT: 50000
-      WEBRTC__PUBLIC_IP: 127.0.0.1
+      WEBRTC__PUBLIC_IP: ${WEBRTC__PUBLIC_IP:-127.0.0.1}
       TELNYX__PUBLIC_KEY: ${TELNYX__PUBLIC_KEY:-}
       VOICE_SERVER__PUBLIC_URL: ${VOICE_SERVER__PUBLIC_URL:-http://127.0.0.1:8300}
+      ALLOWED_ORIGINS: "*"
       RUST_LOG: voice_server=debug,voice_engine=info,agent_kit=info,voice_transport=info
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      STT_PROVIDER: ${STT_PROVIDER:-phosai-stt}
+      STT_BASE_URL: ${STT_BASE_URL:-ws://control.atekervoices.com/control}
+      STT_MODEL: ${STT_MODEL:-phosai-realtime}
+      TTS_PROVIDER: ${TTS_PROVIDER:-phosai-ws}
+      TTS_BASE_URL: ${TTS_BASE_URL:-https://tts.atekervoices.com}
+      TTS_MODEL: ${TTS_MODEL:-spark-tts}
+      TTS_VOICE_ID: ${TTS_VOICE_ID:-pcm_female_1}
       # Write recordings to /recordings (shared with studio-api container via named volume).
       # The Python studio-api serves them at /api/recordings/{filename}.
       RECORDING__OUTPUT_URI: "file:///recordings"
-      ALLOWED_ORIGINS: "http://localhost:3000"
     volumes:
       - recordings:/recordings
     depends_on:
@@ -82,13 +102,18 @@ services:
 
   # Next.js Frontend
   studio-web:
-    image: ghcr.io/ferosai/feros-studio-web:${IMAGE_TAG:-latest}
+    image: feros-studio-web:local
+    build:
+      context: .
+      dockerfile: studio/web/Dockerfile
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
       BACKEND_API_URL: http://studio-api:8000
       WATCHPACK_POLLING: "true"
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
     volumes:
       - ./studio/web:/app
       - /app/node_modules
@@ -96,9 +121,7 @@ services:
       - studio_web_pnpm_store:/root/.local/share/pnpm/store
     depends_on:
       - studio-api
-    command: >
-      sh -c "CI=true pnpm install --frozen-lockfile &&
-             pnpm dev"
+    command: sh -c "pnpm install && pnpm dev -H 0.0.0.0"
 
 volumes:
   pgdata:

@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
           <NuqsAdapter>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
               {children}

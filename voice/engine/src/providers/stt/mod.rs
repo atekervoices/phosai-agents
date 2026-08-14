@@ -26,12 +26,14 @@
 //! | `elevenlabs`       | Segmented HTTP | ElevenLabs (`scribe_v2`, multipart) |
 
 pub mod builtin;
+pub mod canary;
 pub mod cartesia;
 pub mod deepgram;
 pub mod elevenlabs;
 pub mod groq;
 pub mod openai_realtime;
 pub mod openai_whisper;
+pub mod phosai_stt;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -151,10 +153,20 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
             &cfg.model,
             base_lang, // ISO-639-1 only
         )),
+        "canary" => Box::new(canary::CanarySttProvider::new(
+            &cfg.base_url,
+            &cfg.language,
+        )),
         "elevenlabs" => Box::new(elevenlabs::ElevenLabsSttProvider::new(
             &cfg.api_key,
             &cfg.model,
             base_lang, // ISO-639-1 only
+        )),
+        "phosai" | "phosai-stt" | "phosai_stt" => Box::new(phosai_stt::PhosAiSttProvider::new(
+            &cfg.base_url,
+            &cfg.api_key,
+            &cfg.model,
+            if cfg.language.is_empty() { "eng" } else { &cfg.language },
         )),
         _ => {
             // "builtin" or any unrecognised tag → speech-inference WS provider
@@ -194,7 +206,7 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
 pub fn default_stt_p99_latency_ms(provider: &str) -> u32 {
     match provider {
         // Streaming WS — incremental processing, fast finalize → transcript
-        "deepgram" | "cartesia" | "openai-realtime" => 600,
+        "deepgram" | "cartesia" | "openai-realtime" | "phosai" | "phosai-stt" | "phosai_stt" => 600,
         // Segmented HTTP — upload + inference round-trip
         "groq" => 1000,
         "openai-whisper" => 1200,

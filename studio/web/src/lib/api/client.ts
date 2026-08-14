@@ -9,12 +9,15 @@
  */
 
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-export const WS_BASE =
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export const API_BASE = rawApiUrl.replace("localhost", "127.0.0.1");
+
+const rawWsUrl =
   process.env.NEXT_PUBLIC_WS_URL ||
   (process.env.NEXT_PUBLIC_API_URL
     ? process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws")
-    : "ws://localhost:8000");
+    : "ws://127.0.0.1:8000");
+export const WS_BASE = rawWsUrl.replace("localhost", "127.0.0.1");
 
 // ── Config Types (v3_graph) ──────────────────────────────────────
 // Auto-generated via agent.proto
@@ -556,10 +559,17 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...normalizeHeaders(options?.headers),
   };
 
-  const res = await fetch(`${API_BASE}/api${path}`, {
-    ...options,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (err) {
+    throw new Error(
+      `Unable to connect to backend at ${API_BASE}. Please ensure the server is running and accessible.`
+    );
+  }
 
   if (!res.ok) {
     throw await buildApiError(res, `API error: ${res.status}`);

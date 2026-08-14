@@ -36,6 +36,8 @@ pub mod elevenlabs;
 pub mod elevenlabs_ws;
 pub mod groq;
 pub mod openai;
+pub mod phosai;
+pub mod phosai_ws;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -96,8 +98,8 @@ pub trait TtsStreamingProvider: Send {
 
     /// Send a text chunk for the given context (a UUID string for this turn).
     ///
-    /// Non-blocking: enqueues into the writer task.
-    async fn send_text(&mut self, text: &str, context_id: &str);
+    /// Non-blocking: enqueues into the writer task. `is_last` indicates whether this is the final fragment of the turn.
+    async fn send_text(&mut self, text: &str, context_id: &str, is_last: bool);
 
     /// Signal end-of-turn for `context_id` — ask the server to flush all
     /// remaining audio.
@@ -197,6 +199,15 @@ pub fn build_tts_provider(cfg: &TtsProviderConfig) -> TtsMode {
                 &cfg.language,
             )))
         }
+        "phosai-ws" => TtsMode::Streaming(Box::new(phosai_ws::PhosaiWsTtsProvider::new(
+            &cfg.base_url,
+            cfg.output_sample_rate,
+            if !cfg.voice_id.is_empty() {
+                &cfg.voice_id
+            } else {
+                &cfg.model
+            },
+        ))),
         // ── HTTP pull providers ───────────────────────────────────────────────
         "cartesia" => TtsMode::Http(Box::new(cartesia::CartesiaTtsProvider::new(
             &cfg.api_key,
@@ -230,6 +241,15 @@ pub fn build_tts_provider(cfg: &TtsProviderConfig) -> TtsMode {
             &cfg.api_key,
             &cfg.model,
             cfg.output_sample_rate,
+        ))),
+        "phosai" => TtsMode::Http(Box::new(phosai::PhosaiTtsProvider::new(
+            &cfg.base_url,
+            cfg.output_sample_rate,
+            if !cfg.voice_id.is_empty() {
+                &cfg.voice_id
+            } else {
+                &cfg.model
+            },
         ))),
         _ => {
             // "builtin" or any unrecognised tag → speech-inference HTTP provider

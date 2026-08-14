@@ -412,9 +412,7 @@ impl Reactor {
                 self.tracer.mark_stt_first_text();
             }
             SttEvent::PartialTranscript(_) => {
-                // Interim results (e.g. Deepgram with interim_results=true).
-                // Not acted upon in the current pipeline — only final transcripts
-                // drive LLM turns. Included for completeness / future consumers.
+                // Interim results ignored — only final transcripts drive UI/LLM
             }
             SttEvent::Error(reason) => {
                 // The STT WS connection died and reconnect was exhausted.

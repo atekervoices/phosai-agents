@@ -229,6 +229,15 @@ _API_KEY_FIELD = VoiceProviderField(
 STT_PROVIDERS: list[VoiceProviderOption] = [
     # ── Self-hosted ────────────────────────────────────────────────
     VoiceProviderOption(
+        value="canary",
+        label="Canary STT",
+        description="NVIDIA NeMo Canary / Parakeet ASR endpoint",
+        default_base_url="https://canary.atekervoices.com",
+        fields=[
+            VoiceProviderField(key="model", label="Model", placeholder="canary-1b"),
+        ],
+    ),
+    VoiceProviderOption(
         value="faster-whisper",
         label="Faster Whisper",
         description="Self-hosted STT via faster-whisper-server",
@@ -304,10 +313,37 @@ STT_PROVIDERS: list[VoiceProviderOption] = [
             ),
         ],
     ),
+    VoiceProviderOption(
+        value="phosai-stt",
+        label="PhosAI STT",
+        description="PhosAI Real-Time WebSocket Streaming ASR",
+        default_base_url="ws://control.atekervoices.com/control",
+        fields=[],
+    ),
 ]
 
 TTS_PROVIDERS: list[VoiceProviderOption] = [
     # ── Self-hosted ────────────────────────────────────────────────
+    VoiceProviderOption(
+        value="phosai-ws",
+        label="Phosai TTS (WebSocket)",
+        description="Phosai real-time WebSocket streaming TTS",
+        default_base_url="https://tts.atekervoices.com",
+        fields=[
+            VoiceProviderField(key="model", label="Model", placeholder="spark-tts"),
+            VoiceProviderField(key="voice_id", label="Voice ID / Speaker", placeholder="pcm_female_1"),
+        ],
+    ),
+    VoiceProviderOption(
+        value="phosai",
+        label="Phosai TTS (HTTP)",
+        description="Phosai HTTP single-request TTS",
+        default_base_url="https://tts.atekervoices.com",
+        fields=[
+            VoiceProviderField(key="model", label="Model", placeholder="spark-tts"),
+            VoiceProviderField(key="voice_id", label="Voice ID / Speaker", placeholder="pcm_female_1"),
+        ],
+    ),
     VoiceProviderOption(
         value="fish-speech",
         label="Fish Speech",
@@ -534,9 +570,15 @@ async def _get_all_credentials(
     result = await db.execute(query)
     rows = result.scalars().all()
     out: dict[str, bool] = {}
+    no_key_providers = {"canary", "phosai-ws", "phosai", "faster-whisper", "fish-speech"}
+    for slug in provider_slugs:
+        if slug in no_key_providers:
+            out[slug] = True
     for row in rows:
         cfg = row.config_json or {}
         has_key = bool(cfg.get("api_key_encrypted") or cfg.get("api_key"))
+        if row.provider_name in no_key_providers:
+            has_key = True
         out[row.provider_name] = has_key
     return out
 
@@ -1459,7 +1501,7 @@ async def _fetch_builtin_voices(
         return []
     probe_url = base_url.rstrip("/") + "/v1/voices"
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=1.0) as client:
             r = await client.get(probe_url)
         if not r.is_success:
             logger.debug(
@@ -1539,12 +1581,141 @@ async def get_tts_voices(
     if not api_key and row:
         api_key = _normalize_api_key(raw_config.get("api_key", ""))
 
-    if not api_key and provider not in ("fish-speech", "builtin"):
+    if not api_key and provider not in ("fish-speech", "builtin", "phosai", "phosai-ws"):
         logger.info(
             "GET /settings/tts/voices: no API key for provider='{}' — returning empty list.",
             provider,
         )
 
+    if provider in ("phosai", "phosai-ws"):
+        PHOSAI_VOICE_SPECS = [
+            # English
+            ("eng_female_1", "English Female 1", "en", "female"),
+            ("eng_male_1", "English Male 1", "en", "male"),
+            # Nigerian Pidgin
+            ("pcm_female_1", "PCM Female 1 (Nigerian Pidgin)", "en", "female"),
+            ("pcm_female_2", "PCM Female 2 (Nigerian Pidgin)", "en", "female"),
+            ("pcm_female_3", "PCM Female 3 (Nigerian Pidgin)", "en", "female"),
+            ("pcm_female_4", "PCM Female 4 (Nigerian Pidgin)", "en", "female"),
+            ("pcm_female_5", "PCM Female 5 (Nigerian Pidgin)", "en", "female"),
+            ("pcm_male_1", "PCM Male 1 (Nigerian Pidgin)", "en", "male"),
+            ("pcm_male_2", "PCM Male 2 (Nigerian Pidgin)", "en", "male"),
+            ("pcm_male_3", "PCM Male 3 (Nigerian Pidgin)", "en", "male"),
+            ("pcm_male_4", "PCM Male 4 (Nigerian Pidgin)", "en", "male"),
+            ("pcm_male_5", "PCM Male 5 (Nigerian Pidgin)", "en", "male"),
+            # Acholi
+            ("ach_female_2", "Acholi Female 2", "ach", "female"),
+            ("ach_female_6", "Acholi Female 6", "ach", "female"),
+            ("ach_female_7", "Acholi Female 7", "ach", "female"),
+            ("ach_female_8", "Acholi Female 8", "ach", "female"),
+            ("ach_female_9", "Acholi Female 9", "ach", "female"),
+            ("ach_male_1", "Acholi Male 1", "ach", "male"),
+            ("ach_male_3", "Acholi Male 3", "ach", "male"),
+            ("ach_male_4", "Acholi Male 4", "ach", "male"),
+            ("ach_male_5", "Acholi Male 5", "ach", "male"),
+            ("ach_male_10", "Acholi Male 10", "ach", "male"),
+            # Ateso
+            ("teo_female_1", "Ateso Female 1", "teo", "female"),
+            ("teo_male_1", "Ateso Male 1", "teo", "male"),
+            # Runyankore
+            ("nyn_female_1", "Runyankore Female 1", "nyn", "female"),
+            ("nyn_female_2", "Runyankore Female 2", "nyn", "female"),
+            ("nyn_female_4", "Runyankore Female 4", "nyn", "female"),
+            ("nyn_female_5", "Runyankore Female 5", "nyn", "female"),
+            ("nyn_female_10", "Runyankore Female 10", "nyn", "female"),
+            ("nyn_male_3", "Runyankore Male 3", "nyn", "male"),
+            ("nyn_male_6", "Runyankore Male 6", "nyn", "male"),
+            ("nyn_male_7", "Runyankore Male 7", "nyn", "male"),
+            ("nyn_male_8", "Runyankore Male 8", "nyn", "male"),
+            ("nyn_male_9", "Runyankore Male 9", "nyn", "male"),
+            # Swahili
+            ("swa_female_1", "Swahili Female 1", "sw", "female"),
+            ("swa_female_2", "Swahili Female 2", "sw", "female"),
+            ("swa_female_5", "Swahili Female 5", "sw", "female"),
+            ("swa_female_6", "Swahili Female 6", "sw", "female"),
+            ("swa_male_3", "Swahili Male 3", "sw", "male"),
+            ("swa_male_4", "Swahili Male 4", "sw", "male"),
+            ("swa_male_8", "Swahili Male 8", "sw", "male"),
+            # Luganda
+            ("lug_female_4", "Luganda Female 4", "lg", "female"),
+            ("lug_female_5", "Luganda Female 5", "lg", "female"),
+            ("lug_female_7", "Luganda Female 7", "lg", "female"),
+            ("lug_female_8", "Luganda Female 8", "lg", "female"),
+            ("lug_female_10", "Luganda Female 10", "lg", "female"),
+            ("lug_male_1", "Luganda Male 1", "lg", "male"),
+            ("lug_male_2", "Luganda Male 2", "lg", "male"),
+            ("lug_male_3", "Luganda Male 3", "lg", "male"),
+            ("lug_male_6", "Luganda Male 6", "lg", "male"),
+            ("lug_male_9", "Luganda Male 9", "lg", "male"),
+            # Lusoga
+            ("xog_female_1", "Lusoga Female 1", "xog", "female"),
+            ("xog_male_1", "Lusoga Male 1", "xog", "male"),
+            # Kinyarwanda
+            ("kin_female_1", "Kinyarwanda Female 1", "rw", "female"),
+            # Luo
+            ("luo_female_1", "Luo Female 1", "luo", "female"),
+            ("luo_female_2", "Luo Female 2", "luo", "female"),
+            ("luo_female_3", "Luo Female 3", "luo", "female"),
+            ("luo_female_4", "Luo Female 4", "luo", "female"),
+            ("luo_male_1", "Luo Male 1", "luo", "male"),
+            ("luo_male_2", "Luo Male 2", "luo", "male"),
+            ("luo_male_3", "Luo Male 3", "luo", "male"),
+            ("luo_male_4", "Luo Male 4", "luo", "male"),
+            # Kikuyu
+            ("kik_female_2", "Kikuyu Female 2", "ki", "female"),
+            ("kik_female_3", "Kikuyu Female 3", "ki", "female"),
+            ("kik_male_1", "Kikuyu Male 1", "ki", "male"),
+            ("kik_male_4", "Kikuyu Male 4", "ki", "male"),
+            # Hausa
+            ("hau_female_1", "Hausa Female 1", "ha", "female"),
+            ("hau_female_3", "Hausa Female 3", "ha", "female"),
+            ("hau_female_5", "Hausa Female 5", "ha", "female"),
+            ("hau_female_7", "Hausa Female 7", "ha", "female"),
+            ("hau_male_2", "Hausa Male 2", "ha", "male"),
+            ("hau_male_4", "Hausa Male 4", "ha", "male"),
+            ("hau_male_6", "Hausa Male 6", "ha", "male"),
+            ("hau_male_8", "Hausa Male 8", "ha", "male"),
+            # Igbo
+            ("ibo_female_1", "Igbo Female 1", "ig", "female"),
+            ("ibo_female_3", "Igbo Female 3", "ig", "female"),
+            ("ibo_female_5", "Igbo Female 5", "ig", "female"),
+            ("ibo_female_7", "Igbo Female 7", "ig", "female"),
+            ("ibo_male_2", "Igbo Male 2", "ig", "male"),
+            ("ibo_male_4", "Igbo Male 4", "ig", "male"),
+            ("ibo_male_6", "Igbo Male 6", "ig", "male"),
+            ("ibo_male_8", "Igbo Male 8", "ig", "male"),
+            # Twi
+            ("twi_female_2", "Twi Female 2", "tw", "female"),
+            ("twi_female_4", "Twi Female 4", "tw", "female"),
+            ("twi_male_1", "Twi Male 1", "tw", "male"),
+            ("twi_male_3", "Twi Male 3", "tw", "male"),
+            # Yoruba
+            ("yor_female_1", "Yoruba Female 1", "yo", "female"),
+            ("yor_female_3", "Yoruba Female 3", "yo", "female"),
+            ("yor_female_5", "Yoruba Female 5", "yo", "female"),
+            ("yor_female_7", "Yoruba Female 7", "yo", "female"),
+            ("yor_male_2", "Yoruba Male 2", "yo", "male"),
+            ("yor_male_4", "Yoruba Male 4", "yo", "male"),
+            ("yor_male_6", "Yoruba Male 6", "yo", "male"),
+            ("yor_male_8", "Yoruba Male 8", "yo", "male"),
+            # Wolof
+            ("wol_female_1", "Wolof Female 1", "wo", "female"),
+            ("wol_male_1", "Wolof Male 1", "wo", "male"),
+            # Fula
+            ("fat_female_2", "Fula Female 2", "ff", "female"),
+            ("fat_female_4", "Fula Female 4", "ff", "female"),
+            ("fat_male_1", "Fula Male 1", "ff", "male"),
+            ("fat_male_3", "Fula Male 3", "ff", "male"),
+        ]
+        voices = [
+            VoiceOption(voice_id=vid, name=vname, language=vlang, gender=vgen)
+            for vid, vname, vlang, vgen in PHOSAI_VOICE_SPECS
+        ]
+        if language:
+            lang_prefix = language.split("-")[0].lower()
+            filtered = [v for v in voices if not v.language or v.language == lang_prefix]
+            return filtered or voices
+        return voices
     if provider in ("elevenlabs", "elevenlabs-ws"):
         # Always use the personal voice library (/v1/voices).
         # Shared marketplace voices (/v1/shared-voices) require the user to first

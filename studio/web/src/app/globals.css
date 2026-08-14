@@ -64,7 +64,7 @@
   --card-foreground: #1a1a1a;
   --popover: #ffffff;
   --popover-foreground: #1a1a1a;
-  --primary: #e8590c;
+  --primary: #D9A700;
   --primary-foreground: #ffffff;
   --secondary: #f6f6f6;
   --secondary-foreground: #444444;
@@ -76,7 +76,7 @@
   --destructive-foreground: #ffffff;
   --border: #ebebeb;
   --input: #ebebeb;
-  --ring: rgba(232, 89, 12, 0.12);
+  --ring: rgba(217, 167, 0, 0.2);
   --success: #30a46c;
   --success-foreground: #ffffff;
   --panel: #18181b;

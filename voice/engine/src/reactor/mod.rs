@@ -565,8 +565,8 @@ impl Reactor {
                     tokio::spawn(async move {
                         while let Some(cmd) = cmd_rx.recv().await {
                             match cmd {
-                                WsCmd::SendText { text, context_id } => {
-                                    provider.send_text(&text, &context_id).await;
+                                WsCmd::SendText { text, context_id, is_last } => {
+                                    provider.send_text(&text, &context_id, is_last).await;
                                 }
                                 WsCmd::Flush { context_id } => {
                                     provider.flush(&context_id).await;

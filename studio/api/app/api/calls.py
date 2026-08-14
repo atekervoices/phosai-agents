@@ -281,5 +281,6 @@ async def proxy_recording(
     return FileResponse(
         path=file_path,
         media_type=media_type,
-        filename=file_path.name,
+        content_disposition_type="inline",
+        headers={"Access-Control-Allow-Origin": "*"},
     )

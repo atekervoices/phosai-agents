@@ -68,7 +68,7 @@ function isOpenBubble(entry: TimelineEntry, role: string): entry is MessageTimel
 
 /**
  * Apply a `transcript_chunk` event (non-final streaming token).
- *
+ *r
  * Property A: Never increases the array length when an open bubble exists.
  */
 export function applyChunk(prev: TimelineEntry[], event: TranscriptChunkEvent): TimelineEntry[] {
@@ -95,6 +95,8 @@ export function applyChunk(prev: TimelineEntry[], event: TranscriptChunkEvent): 
  */
 export function applyTranscript(prev: TimelineEntry[], event: TranscriptEvent): TimelineEntry[] {
   const { role, text } = event;
+  if (!text) return prev;
+
   const lastIdx = prev.length - 1;
   const last = prev[lastIdx];
 
@@ -103,6 +105,11 @@ export function applyTranscript(prev: TimelineEntry[], event: TranscriptEvent): 
     const updated = [...prev];
     updated[lastIdx] = { ...last, text, _final: true };
     return updated;
+  }
+
+  // Deduplicate exact consecutive transcript messages
+  if (last && last.kind === "message" && last.role === role && last.text === text) {
+    return prev;
   }
 
   // Classic pipeline or first bubble: just append a new closed entry.

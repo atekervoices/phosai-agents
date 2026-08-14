@@ -249,7 +249,7 @@ impl TtsStreamingProvider for DeepgramWsTtsProvider {
         Ok(())
     }
 
-    async fn send_text(&mut self, text: &str, context_id: &str) {
+    async fn send_text(&mut self, text: &str, context_id: &str, _is_last: bool) {
         let Some(tx) = &self.conn_msg_tx else { return };
         // Mirror context_id into the reader so it can tag audio frames + Flushed.
         if let Some(ctx_tx) = &self.context_id_tx {

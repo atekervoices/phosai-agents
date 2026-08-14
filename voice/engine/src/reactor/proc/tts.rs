@@ -28,59 +28,43 @@ use crate::types::TtsEvent;
 // Both the HTTP and WS paths accumulate tokens and flush at sentence
 // boundaries for better synthesis quality.
 
-/// Sentence-ending punctuation — flush buffer to TTS.
-const SENTENCE_BREAKS: &[char] = &[
-    '.', '!', '?', '\n', '\u{3002}', // 。 CJK full stop
-    '\u{FF01}', // ！ fullwidth exclamation
-    '\u{FF1F}', // ？ fullwidth question
-];
-/// Clause-ending punctuation — flush if buffer is long enough.
-const CLAUSE_BREAKS: &[char] = &[
-    ',', ':', ';', '\u{2014}', '\u{2013}', '\u{FF0C}', // ， fullwidth comma
-    '\u{FF1A}', // ： fullwidth colon
-    '\u{FF1B}', // ； fullwidth semicolon
+/// Punctuation marks for fragment boundaries (matching sparktts.py line 466).
+const PUNCT_MARKS: &[char] = &[
+    '.', '!', '?', ',', ';', ':', '\n',
+    '\u{3002}', '\u{FF01}', '\u{FF1F}'
 ];
 
-/// Character count (not byte length) for flush threshold consistency
-/// across Latin (1 byte/char) and CJK (3 bytes/char) text.
-fn char_len(s: &str) -> usize {
-    s.chars().count()
-}
-
-/// Decide whether the accumulated buffer should be flushed to TTS.
-fn should_flush(buffer: &str, chunk_count: u32) -> bool {
-    let trimmed = buffer.trim_end();
-    let clen = char_len(buffer);
-
-    if chunk_count == 0 {
-        trimmed.ends_with(SENTENCE_BREAKS) || trimmed.ends_with(CLAUSE_BREAKS) || clen > 30
-    } else {
-        trimmed.ends_with(SENTENCE_BREAKS)
-            || (clen > 15 && trimmed.ends_with(CLAUSE_BREAKS))
-            || clen > 200
+/// Extract next fragment matching Python tts.py:
+/// 1. Finds earliest punctuation mark in `buffer`. Slices up to and including punctuation.
+/// 2. If no punctuation and `buffer` > 80 chars, finds last space (> 20 chars) and slices there.
+fn extract_next_fragment(buffer: &mut String) -> Option<String> {
+    let mut earliest_pos: Option<usize> = None;
+    for (idx, ch) in buffer.char_indices() {
+        if PUNCT_MARKS.contains(&ch) {
+            earliest_pos = Some(idx);
+            break;
+        }
     }
-}
 
-/// Find the best split point within `buffer` for force-flushing long text.
-fn split_at_best_break(buffer: &str) -> (&str, &str) {
-    if let Some(pos) = buffer.rfind(|c: char| SENTENCE_BREAKS.contains(&c)) {
-        let split = pos + c_len_at(buffer, pos);
-        return (&buffer[..split], &buffer[split..]);
+    if let Some(pos) = earliest_pos {
+        let ch_len = buffer[pos..].chars().next().map_or(1, |c| c.len_utf8());
+        let split_idx = pos + ch_len;
+        let raw_chunk = buffer[..split_idx].to_string();
+        *buffer = buffer[split_idx..].trim_start().to_string();
+        return Some(raw_chunk);
     }
-    if let Some(pos) = buffer.rfind(|c: char| CLAUSE_BREAKS.contains(&c)) {
-        let split = pos + c_len_at(buffer, pos);
-        return (&buffer[..split], &buffer[split..]);
-    }
-    if let Some(pos) = buffer.rfind(char::is_whitespace) {
-        let split = pos + c_len_at(buffer, pos);
-        return (&buffer[..split], &buffer[split..]);
-    }
-    (buffer, "")
-}
 
-/// UTF-8 byte length of the character at byte position `pos`.
-fn c_len_at(s: &str, pos: usize) -> usize {
-    s[pos..].chars().next().map_or(1, |c| c.len_utf8())
+    if buffer.chars().count() > 80 {
+        if let Some(last_space) = buffer.rfind(' ') {
+            if last_space > 20 {
+                let raw_chunk = buffer[..last_space].to_string();
+                *buffer = buffer[last_space..].trim_start().to_string();
+                return Some(raw_chunk);
+            }
+        }
+    }
+
+    None
 }
 
 // ── WS handle for session-level connection reuse ─────────────
@@ -99,7 +83,8 @@ pub struct WsTtsHandle {
 #[derive(Debug)]
 pub enum WsCmd {
     /// Send text to the WS provider for a given context.
-    SendText { text: String, context_id: String },
+    /// `is_last` is true only for the final fragment of a turn.
+    SendText { text: String, context_id: String, is_last: bool },
     /// Flush (end-of-turn) for the given context.
     Flush { context_id: String },
     /// Cancel (barge-in) for the given context.
@@ -172,18 +157,8 @@ impl TtsStage {
                     Some(Some(token)) => {
                         buffer.push_str(&token);
 
-                        if should_flush(&buffer, chunk_count) && !buffer.trim().is_empty() {
-                            let (flush_text, remainder) = if char_len(&buffer) > 200
-                                && !buffer.trim_end().ends_with(SENTENCE_BREAKS)
-                            {
-                                split_at_best_break(&buffer)
-                            } else {
-                                (buffer.as_str(), "")
-                            };
-
-                            let to_send = flush_text.trim().to_string();
-                            let leftover = remainder.to_string();
-
+                        while let Some(fragment) = extract_next_fragment(&mut buffer) {
+                            let to_send = fragment.trim().to_string();
                             if !to_send.is_empty() {
                                 match provider.synthesize_chunk(&to_send, &voice_id).await {
                                     Some(pcm) => {
@@ -202,7 +177,6 @@ impl TtsStage {
                                     ),
                                 }
                             }
-                            buffer = leftover;
                         }
                     }
                 }
@@ -246,39 +220,67 @@ impl TtsStage {
 
         // Spawn token-accumulation + send task.
         // Tokens are buffered and flushed at sentence/clause boundaries
-        // for better synthesis quality.
+        // for better synthesis quality (matching Python tts.py).
         let ctx = context_id.clone();
         let cmd_tx2 = cmd_tx;
         tokio::spawn(async move {
             let mut buffer = String::new();
             let mut chunk_count = 0u32;
+            // Hold back the most recently extracted fragment so we can mark the
+            // very last one with is_last=true when the stream ends.
+            // Matching sparktts.py: "continue": true for streaming, "continue": false for final.
+            let mut pending_fragment: Option<String> = None;
 
             loop {
                 tokio::select! {
                     biased; // cancel_rx must always win over pending tokens on barge-in
                     _ = &mut cancel_rx => {
-                        // `TtsStage::cancel()` has already sent `WsCmd::Cancel` directly to
-                        // the session cmd task. We break immediately without flushing so we
-                        // don't send stale tokens that would arrive after the Cancel command.
                         break;
                     }
                     msg = token_rx.recv() => match msg {
                         Some(None) | None => {
+                            // Stream ended — drain remaining fragments from buffer.
+                            while let Some(fragment) = extract_next_fragment(&mut buffer) {
+                                let trimmed = fragment.trim().to_string();
+                                if !trimmed.is_empty() {
+                                    if let Some(prev) = pending_fragment.take() {
+                                        let _ = cmd_tx2.send(WsCmd::SendText {
+                                            text: prev,
+                                            context_id: ctx.clone(),
+                                            is_last: false,
+                                        });
+                                        chunk_count += 1;
+                                    }
+                                    pending_fragment = Some(trimmed);
+                                }
+                            }
+                            // Leftover text in buffer
                             if !buffer.trim().is_empty() {
+                                if let Some(prev) = pending_fragment.take() {
+                                    let _ = cmd_tx2.send(WsCmd::SendText {
+                                        text: prev,
+                                        context_id: ctx.clone(),
+                                        is_last: false,
+                                    });
+                                    chunk_count += 1;
+                                }
+                                pending_fragment = Some(buffer.trim().to_string());
+                                buffer.clear();
+                            }
+
+                            // Send FINAL fragment with is_last=true → "continue": false
+                            if let Some(last) = pending_fragment.take() {
                                 let _ = cmd_tx2.send(WsCmd::SendText {
-                                    text: buffer.trim().to_string(),
+                                    text: last,
                                     context_id: ctx.clone(),
+                                    is_last: true,
                                 });
                                 chunk_count += 1;
                             }
+
                             if chunk_count > 0 {
-                                // Text was sent — flush to Cartesia; it will
-                                // reply with is_final which becomes TtsEvent::Finished.
                                 let _ = cmd_tx2.send(WsCmd::Flush { context_id: ctx.clone() });
                             } else {
-                                // No text was ever sent — Cartesia won't send
-                                // is_final, so emit TtsEvent::Finished directly
-                                // to unblock the reactor.
                                 let _ = finished_tx.send(TtsEvent::Finished).await;
                             }
                             break;
@@ -286,29 +288,42 @@ impl TtsStage {
                         Some(Some(token)) => {
                             buffer.push_str(&token);
 
-                            if should_flush(&buffer, chunk_count)
-                                && !buffer.trim().is_empty()
-                            {
-                                let (flush_text, remainder) =
-                                    if char_len(&buffer) > 200
-                                        && !buffer.trim_end().ends_with(SENTENCE_BREAKS)
-                                    {
-                                        split_at_best_break(&buffer)
-                                    } else {
-                                        (buffer.as_str(), "")
-                                    };
-
-                                let to_send = flush_text.trim().to_string();
-                                let leftover = remainder.to_string();
-
-                                if !to_send.is_empty() {
-                                    let _ = cmd_tx2.send(WsCmd::SendText {
-                                        text: to_send,
-                                        context_id: ctx.clone(),
-                                    });
-                                    chunk_count += 1;
+                            // Extract at punctuation boundaries (matching sparktts.py line 466:
+                            // punct_marks = {'.', '!', '?', ',', ';', ':'})
+                            while let Some(fragment) = extract_next_fragment(&mut buffer) {
+                                let trimmed = fragment.trim().to_string();
+                                if !trimmed.is_empty() {
+                                    if let Some(prev) = pending_fragment.take() {
+                                        let _ = cmd_tx2.send(WsCmd::SendText {
+                                            text: prev,
+                                            context_id: ctx.clone(),
+                                            is_last: false,
+                                        });
+                                        chunk_count += 1;
+                                    }
+                                    pending_fragment = Some(trimmed);
                                 }
-                                buffer = leftover;
+                            }
+
+                            // Long buffer fallback (matching sparktts.py line 498: > 80 chars)
+                            if buffer.len() > 80 {
+                                if let Some(last_space) = buffer.rfind(' ') {
+                                    if last_space > 20 {
+                                        let send_raw = buffer[..last_space].trim().to_string();
+                                        buffer = buffer[last_space..].trim_start().to_string();
+                                        if !send_raw.is_empty() {
+                                            if let Some(prev) = pending_fragment.take() {
+                                                let _ = cmd_tx2.send(WsCmd::SendText {
+                                                    text: prev,
+                                                    context_id: ctx.clone(),
+                                                    is_last: false,
+                                                });
+                                                chunk_count += 1;
+                                            }
+                                            pending_fragment = Some(send_raw);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

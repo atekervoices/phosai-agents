@@ -27,9 +27,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --de
 ENV PATH="/root/.cargo/bin:${PATH}"
 # sccache is not present here — ensure cargo uses rustc directly.
 ENV RUSTC_WRAPPER=""
+ENV CARGO_NET_RETRY=10
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /usr/local/bin/uv
+RUN pip install uv
 
 # Keep the venv in a fixed path so the final stage can copy it cleanly.
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

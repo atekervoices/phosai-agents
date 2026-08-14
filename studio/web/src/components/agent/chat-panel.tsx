@@ -5,7 +5,7 @@ import {
   AiBrain01Icon,
   ArrowDown01Icon,
   ArrowTurnBackwardIcon,
-  ArtificialIntelligence08Icon,
+  Robot01Icon,
   AttachmentIcon,
   Cancel01Icon,
   CheckmarkCircle02Icon,
@@ -390,7 +390,7 @@ export default function ChatPanel({
               ) : (
                 <div className="flex gap-3">
                   <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    <HugeiconsIcon icon={ArtificialIntelligence08Icon} className="size-4" />
+                    <HugeiconsIcon icon={Robot01Icon} className="size-4" />
                   </div>
                   <div className="flex-1 min-w-0 space-y-3">
                     {/* Progress events */}

@@ -78,7 +78,7 @@ class AuthConfig(BaseModel):
     Env vars: AUTH__SECRET_KEY, AUTH__API_KEY, AUTH__ACCESS_TOKEN_EXPIRE_MINUTES
     """
 
-    secret_key: str = "dev-secret-change-in-production"
+    secret_key: str = "n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s="
     credential_salt: str = "voice-agent-os-credential-vault-v1"
     api_key: str = ""  # Set via AUTH__API_KEY; empty = auth disabled in dev
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
@@ -121,19 +121,19 @@ class LLMConfig(BaseModel):
     """
 
     provider: str = Field(
-        default="ollama",
+        default_factory=lambda: os.getenv("LLM_PROVIDER", "openai"),
         description="LLM provider: groq | openai | anthropic | gemini | deepseek | ollama | openrouter | custom",
     )
     model: str = Field(
-        default="llama3.2",
+        default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o"),
         description="Model name or ID for the chosen provider",
     )
     base_url: str = Field(
-        default="http://localhost:11434",
+        default_factory=lambda: os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
         description="Base URL for the LLM API",
     )
     api_key: str = Field(
-        default="",
+        default_factory=lambda: os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY", ""),
         description="Required for openrouter / openai / custom providers",
     )
     temperature: float = Field(default=0.7)
@@ -361,10 +361,13 @@ def llm_config_from_row(row: Any) -> LLMConfig:
             _decrypt_inline(cfg["api_key_encrypted"]).get("value", "")
         )
 
+    if not api_key:
+        api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY", "")
+
     return LLMConfig(
-        provider=cfg.get("provider", "ollama"),
-        model=cfg.get("model", "llama3.2"),
-        base_url=cfg.get("base_url", "http://localhost:11434"),
+        provider=cfg.get("provider") or os.getenv("LLM_PROVIDER", "openai"),
+        model=cfg.get("model") or os.getenv("LLM_MODEL", "gpt-4o"),
+        base_url=cfg.get("base_url") or os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
         api_key=api_key,
         temperature=cfg.get("temperature", 0.7),
         max_tokens=cfg.get("max_tokens", 256),

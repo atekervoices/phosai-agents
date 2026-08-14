@@ -779,7 +779,7 @@ fn build_llm_provider(providers: &ProviderConfig) -> Box<dyn LlmProvider> {
         ),
         "openai" => try_rig_provider!(
             "OpenAI",
-            agent_kit::OpenAiProvider::new(&providers.llm_api_key, base_url, &providers.llm_model)
+            agent_kit::OpenAiCompatProvider::new(&providers.llm_api_key, base_url, &providers.llm_model)
         ),
         "anthropic" => try_rig_provider!(
             "Anthropic",

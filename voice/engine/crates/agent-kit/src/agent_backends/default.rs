@@ -499,8 +499,13 @@ impl DefaultAgentBackend {
                 self.pending_tool_calls
                     .iter()
                     .map(|tc| {
+                        let call_id = tc
+                            .tool_call_id
+                            .clone()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or_else(|| format!("call_{}", Uuid::new_v4().simple()));
                         let mut v = serde_json::json!({
-                            "id": tc.tool_call_id,
+                            "id": call_id,
                             "type": "function",
                             "function": {
                                 "name": tc.name,

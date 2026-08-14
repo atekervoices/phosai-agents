@@ -117,8 +117,8 @@ impl ProviderConfig {
             }
 
             ProviderConfig::OpenAi { fields } => {
-                use crate::providers::openai::OpenAiProvider;
-                Ok(Box::new(OpenAiProvider::new(
+                use crate::providers::openai_compat::OpenAiCompatProvider;
+                Ok(Box::new(OpenAiCompatProvider::new(
                     &fields.api_key,
                     fields.base_url.as_deref(),
                     &fields.model,

@@ -313,7 +313,7 @@ impl TtsStreamingProvider for ElevenLabsWsTtsProvider {
         Ok(())
     }
 
-    async fn send_text(&mut self, text: &str, context_id: &str) {
+    async fn send_text(&mut self, text: &str, context_id: &str, _is_last: bool) {
         let Some(tx) = &self.conn_msg_tx else { return };
 
         // If the managed WS connection just reconnected, clear stale context

@@ -139,6 +139,7 @@ pub(crate) fn convert_messages(
 ) -> (Option<String>, Vec<rig_msg::Message>) {
     let mut preamble_parts: Vec<String> = Vec::new();
     let mut rig_msgs: Vec<rig_msg::Message> = Vec::new();
+    let mut last_tool_call_id: Option<String> = None;
 
     for msg in messages {
         let content_str = match &msg.content {
@@ -162,9 +163,24 @@ pub(crate) fn convert_messages(
                 }
                 if let Some(tool_calls) = &msg.tool_calls {
                     for tc in tool_calls {
-                        if let (Some(id), Some(func)) =
-                            (tc.get("id").and_then(|v| v.as_str()), tc.get("function"))
-                        {
+                        if let Some(func) = tc.get("function") {
+                            let id_str = tc
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .filter(|s| !s.is_empty())
+                                .or_else(|| {
+                                    tc.get("call_id")
+                                        .and_then(|v| v.as_str())
+                                        .filter(|s| !s.is_empty())
+                                })
+                                .or_else(|| {
+                                    tc.get("tool_call_id")
+                                        .and_then(|v| v.as_str())
+                                        .filter(|s| !s.is_empty())
+                                })
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| format!("call_{}", uuid::Uuid::new_v4().simple()));
+                            last_tool_call_id = Some(id_str.clone());
                             let name = func
                                 .get("name")
                                 .and_then(|n| n.as_str())
@@ -182,7 +198,7 @@ pub(crate) fn convert_messages(
                                 .map(str::to_string);
                             parts.push(rig_msg::AssistantContent::ToolCall(
                                 rig_msg::ToolCall::new(
-                                    id.to_string(),
+                                    id_str,
                                     ToolFunction { name, arguments },
                                 )
                                 .with_signature(signature),
@@ -198,7 +214,12 @@ pub(crate) fn convert_messages(
                 }
             }
             "tool" => {
-                let tool_call_id = msg.tool_call_id.as_deref().unwrap_or("unknown");
+                let tool_call_id = msg
+                    .tool_call_id
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| last_tool_call_id.as_deref())
+                    .unwrap_or("call_000000000000000000000000");
                 rig_msgs.push(rig_msg::Message::tool_result(tool_call_id, &content_str));
             }
             _ => {

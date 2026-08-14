@@ -50,7 +50,7 @@ function getCategoryColor(category: string) {
       return "bg-violet-500/10 text-violet-600 dark:text-violet-400";
     case "crm":
     case "marketing":
-      return "bg-orange-500/10 text-orange-600 dark:text-orange-400";
+      return "bg-[#D9A700]/10 text-[#D9A700]";
     case "ai":
     case "dev-tools":
       return "bg-sky-500/10 text-sky-600 dark:text-sky-400";

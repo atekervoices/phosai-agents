@@ -18,9 +18,9 @@ import {
   LeftToRightListBulletIcon,
   Settings03Icon,
 } from "@hugeicons/core-free-icons";
-import { useState, useRef, useEffect, useCallback, use } from "react";
+import { useState, useRef, useEffect, useCallback, use, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -114,14 +114,14 @@ type FlowUpdateState = {
   mode: "create" | "update";
 };
 
-import { Suspense } from "react";
-
-
-function AgentDetailPageContent({ params }: { params: Promise<{ id: string; workspace_slug: string }> }) {
+function AgentDetailPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const { id, workspace_slug } = use(params);
+  const params = useParams();
+  const id = (params?.id as string) || "";
+  const workspace_slug = (params?.workspace_slug as string) || "";
+
   const [agent, setAgent] = useState<Agent | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeTab, setActiveTabInternal] = useState<PreviewTab>(
@@ -612,9 +612,9 @@ function AgentDetailPageContent({ params }: { params: Promise<{ id: string; work
   // ── Render ────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-x-0 bottom-0 top-0 left-60 flex bg-background text-foreground z-30">
+    <div className="fixed inset-y-0 right-0 left-60 flex bg-background text-foreground z-30 overflow-hidden">
       {/* ═══ LEFT PANEL — Chat ═══ */}
-      <div className="flex w-120 shrink-0 flex-col min-w-0 border-r border-border">
+      <div className="flex w-[380px] xl:w-[420px] shrink-0 flex-col min-w-0 border-r border-border bg-background">
         {/* Header - Command Center Style */}
         <div className="flex h-14 items-center justify-between border-b border-border/60 bg-accent/10 px-4 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-4">
@@ -1331,14 +1331,16 @@ function FlowBusyOverlay({ mode }: { mode: "create" | "update" }) {
   );
 }
 
-export default function AgentDetailPage(props: { params: Promise<{ id: string; workspace_slug: string }> }) {
+export default function AgentDetailPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center p-4">Loading agent...</div>
+        <div className="flex h-screen items-center justify-center p-4 text-sm text-muted-foreground">
+          <Spinner className="size-5 mr-2" /> Loading agent details...
+        </div>
       }
     >
-      <AgentDetailPageContent {...props} />
+      <AgentDetailPageContent />
     </Suspense>
   );
 }

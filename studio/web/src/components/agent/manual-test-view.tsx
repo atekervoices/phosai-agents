@@ -159,8 +159,8 @@ export default function ManualTestView({
   // WebSocket ref (for UI events — transcripts, state, tools)
   const wsRef = useRef<WebSocket | null>(null);
   // Voice server URL — from Settings, defaults to localhost:8300 if not configured
-  const [voiceServerUrl, setVoiceServerUrl] = useState("http://localhost:8300");
-  const attemptedVoiceServerUrlRef = useRef("http://localhost:8300");
+  const [voiceServerUrl, setVoiceServerUrl] = useState("http://127.0.0.1:8300");
+  const attemptedVoiceServerUrlRef = useRef("http://127.0.0.1:8300");
   // Voice error dedup: at most one toast per session, suppress on user-initiated stop
   const voiceStopExpectedRef = useRef(false);
   const voiceToastShownRef = useRef(false);
@@ -185,7 +185,7 @@ export default function ManualTestView({
       .getTelephony()
       .then((s) => {
         if (s.voice_server_url) {
-          const normalizedVoiceServerUrl = s.voice_server_url.replace(/\/$/, "");
+          const normalizedVoiceServerUrl = s.voice_server_url.replace(/\/$/, "").replace("localhost", "127.0.0.1");
           setVoiceServerUrl(normalizedVoiceServerUrl);
           attemptedVoiceServerUrlRef.current = normalizedVoiceServerUrl;
         }
@@ -227,7 +227,7 @@ export default function ManualTestView({
       icon: <Spinner className="size-5 text-primary-foreground" />,
     },
     speaking: {
-      color: "bg-orange-500 animate-pulse",
+      color: "bg-[#D9A700] animate-pulse",
       label: "Speaking",
       icon: <HugeiconsIcon icon={Mic01Icon} className="size-5 text-primary-foreground" />,
     },
@@ -544,13 +544,18 @@ export default function ManualTestView({
 
       // 8. Handle incoming audio track from server
       pc.ontrack = (e) => {
-        if (e.track.kind === "audio" && remoteAudioRef.current) {
-          const audio = remoteAudioRef.current;
-          audio.srcObject =
+        if (e.track.kind === "audio") {
+          let audio = remoteAudioRef.current;
+          if (!audio) {
+            audio = new Audio();
+            audio.autoplay = true;
+            remoteAudioRef.current = audio;
+          }
+          const mediaStream =
             e.streams && e.streams.length > 0 ? e.streams[0] : new MediaStream([e.track]);
+          audio.srcObject = mediaStream;
           audio.play().catch((err) => {
-            if (process.env.NODE_ENV === "development")
-              console.warn("[voice] audio.play() returned an error:", err);
+            console.warn("[voice] audio.play() auto-play error, retrying on user interaction:", err);
           });
         }
       };
@@ -793,7 +798,7 @@ export default function ManualTestView({
                             : voiceState === "processing"
                               ? "bg-primary/50"
                               : voiceState === "speaking"
-                                ? "bg-orange-400 scale-110"
+                                ? "bg-[#D9A700] scale-110"
                                 : "bg-primary/10"
                       }`}
                     />

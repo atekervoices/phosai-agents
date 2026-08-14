@@ -152,7 +152,7 @@ const PROVIDER_HELP: Record<string, { models: string[]; docs: string; placeholde
   },
 };
 
-const DEFAULT_VOICE_SERVER_URL = "http://localhost:8300";
+const DEFAULT_VOICE_SERVER_URL = "http://127.0.0.1:8300";
 
 const SETTINGS_TABS = [
   { id: "ai-models", label: "AI Models" },
@@ -633,6 +633,9 @@ const STT_WS_PROVIDERS = new Set([
   "deepgram", // STT — Deepgram nova-3 WS
   "cartesia", // STT — Cartesia Ink Whisper WS
   "openai-realtime", // STT — GPT-4o Realtime WS
+  "phosai-stt", // STT — PhosAI Real-Time dual-WS ASR
+  "phosai",
+  "phosai_stt",
 ]);
 
 function getProviderCategory(value: string, type: "stt" | "tts"): "self-hosted" | "ws" | "http" {
@@ -721,7 +724,7 @@ function VoiceProviderCard({
   useEffect(() => {
     let active = true;
     const fetchCatalog = async () => {
-      if (!provider || provider === "faster-whisper" || provider === "fish-speech") {
+      if (!provider || provider === "faster-whisper" || provider === "fish-speech" || provider === "phosai-stt" || provider === "phosai") {
         if (active) setModelCatalog([]);
         return;
       }
@@ -1779,7 +1782,7 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 text-orange-500/80 text-[10px] leading-relaxed mt-6">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-[#D9A700]/10 border border-[#D9A700]/20 text-[#D9A700] text-[10px] leading-relaxed mt-6">
                 <HugeiconsIcon icon={AlertCircleIcon} className="size-3.5 shrink-0" />
                 <span>
                   Provider credentials (Twilio/Telnyx) are now entered when importing numbers and
@@ -1942,7 +1945,7 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <HugeiconsIcon icon={Alert01Icon} className="size-3.5 text-orange-500" />
+                          <HugeiconsIcon icon={Alert01Icon} className="size-3.5 text-[#D9A700]" />
                         </TooltipTrigger>
                         <TooltipContent sideOffset={6}>
                           Langfuse is enabled, but required key(s) are missing.

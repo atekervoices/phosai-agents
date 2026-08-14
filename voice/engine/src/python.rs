@@ -531,7 +531,7 @@ fn build_runner_llm_provider(
         "groq" => try_provider!("Groq", GroqProvider::new(llm_api_key, llm_model)),
         "openai" => try_provider!(
             "OpenAI",
-            OpenAiProvider::new(llm_api_key, base_url, llm_model)
+            OpenAiCompatProvider::new(llm_api_key, base_url, llm_model)
         ),
         "anthropic" => try_provider!(
             "Anthropic",

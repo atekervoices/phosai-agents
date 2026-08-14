@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # ── Voice Server — Rust binary ────────────────────────────────────
 # Multi-stage build: compile in Ubuntu 24.04 (glibc 2.39), copy binary into
 # a slim Ubuntu 24.04 runtime image.
