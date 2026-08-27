@@ -618,7 +618,7 @@ export default function ManualTestView({
 
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === "failed") {
-          stopVoice();
+          console.warn("[webrtc] ICE connection failed — WebRTC UDP media path unreachable");
         }
       };
 
