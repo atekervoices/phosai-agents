@@ -77,7 +77,7 @@ services:
       WEBRTC__UDP_PORT: 50000
       WEBRTC__PUBLIC_IP: ${WEBRTC__PUBLIC_IP:-127.0.0.1}
       TELNYX__PUBLIC_KEY: ${TELNYX__PUBLIC_KEY:-}
-      VOICE_SERVER__PUBLIC_URL: ${VOICE_SERVER__PUBLIC_URL:-http://127.0.0.1:8300}
+      VOICE_SERVER__PUBLIC_URL: ${VOICE_SERVER__PUBLIC_URL}
       ALLOWED_ORIGINS: "*"
       RUST_LOG: voice_server=debug,voice_engine=info,agent_kit=info,voice_transport=info
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
