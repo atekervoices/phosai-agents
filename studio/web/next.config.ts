@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
     "127.0.0.1:3000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "studio.phosaico.com",
+    "api.phosaico.com",
+    "voice.phosaico.com",
+    "*.phosaico.com",
+    "*.phosai.com",
   ],
 };
 
