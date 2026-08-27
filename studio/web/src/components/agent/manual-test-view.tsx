@@ -179,9 +179,10 @@ export default function ManualTestView({
   const streamRef = useRef<MediaStream | null>(null);
   // WebSocket ref (for UI events — transcripts, state, tools)
   const wsRef = useRef<WebSocket | null>(null);
-  // Voice server URL — from Settings, defaults to localhost:8300 if not configured
-  const [voiceServerUrl, setVoiceServerUrl] = useState("http://127.0.0.1:8300");
-  const attemptedVoiceServerUrlRef = useRef("http://127.0.0.1:8300");
+  // Voice server URL — from process.env or Settings, defaults to localhost:8300 if not configured
+  const defaultVoiceUrl = process.env.NEXT_PUBLIC_VOICE_SERVER_URL || "http://127.0.0.1:8300";
+  const [voiceServerUrl, setVoiceServerUrl] = useState(defaultVoiceUrl);
+  const attemptedVoiceServerUrlRef = useRef(defaultVoiceUrl);
   // Voice error dedup: at most one toast per session, suppress on user-initiated stop
   const voiceStopExpectedRef = useRef(false);
   const voiceToastShownRef = useRef(false);
