@@ -18,6 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { type Agent, api, WS_BASE } from "@/lib/api/client";
 import { type TimelineEntry, applyChunk, applyTranscript } from "./timeline-reducer";
+import { VoiceConversation, type VoiceMode, type VoiceTurn } from "@/components/elements/voice-conversation";
+import { VoiceOrb, VoiceControl, useVoiceVolume } from "@/components/assistant-ui/voice";
+import {
+  ChatPanelUserMessage,
+  ChatPanelAssistantMessage,
+  ChatPanelErrorMessage,
+  ChatPanelTyping,
+  ChatPanelComposer,
+} from "@/components/elements/chat-panel";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -149,9 +158,21 @@ export default function ManualTestView({
   const config = agent?.current_config;
   const isMissingVoiceId = agent !== null && !config?.voice_id?.trim();
 
-  // Voice test state
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [voiceTimeline, setVoiceTimeline] = useState<TimelineEntry[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [activeStream, setActiveStream] = useState<MediaStream | null>(null);
+  const measuredVolume = useVoiceVolume(activeStream);
+
+  const toggleMute = useCallback(() => {
+    if (streamRef.current) {
+      const audioTracks = streamRef.current.getAudioTracks();
+      audioTracks.forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted((prev) => !prev);
+    }
+  }, []);
   // WebRTC refs
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -400,6 +421,7 @@ export default function ManualTestView({
       audio.srcObject = null;
     }
     stream?.getTracks().forEach((t) => t.stop());
+    setActiveStream(null);
     setVoiceState("idle");
   }, []);
 
@@ -409,10 +431,13 @@ export default function ManualTestView({
       if (ev.data instanceof ArrayBuffer || ev.data instanceof Blob) return; // ignore audio
       try {
         const msg = JSON.parse(ev.data);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[voice-ws]", msg);
+        }
         if (msg.type === "state_changed") {
           setVoiceState(msg.state);
         } else if (msg.type === "interrupt") {
-          // No local audio buffer to flush — WebRTC audio is handled by the browser
+          // No local audio buffer to flush — WebRTC audio handled by browser
         } else if (msg.type === "transcript") {
           setVoiceTimeline((p) =>
             applyTranscript(p, {
@@ -422,13 +447,7 @@ export default function ManualTestView({
             })
           );
         } else if (msg.type === "transcript_chunk") {
-          setVoiceTimeline((p) =>
-            applyChunk(p, {
-              type: "transcript_chunk",
-              role: msg.role,
-              text: typeof msg.text === "string" ? msg.text : "",
-            })
-          );
+          // Ignored — only canonical final transcripts drive the timeline
         } else if (msg.type === "tool_activity") {
           const activity = parseToolActivityPayload(msg as Record<string, unknown>);
           if (activity) {
@@ -495,6 +514,7 @@ export default function ManualTestView({
         return;
       }
       streamRef.current = stream;
+      setActiveStream(stream);
 
       // 2. Create session directly on voice-server (no Python needed)
       const voiceBase = latestVoiceServerUrl;
@@ -575,7 +595,7 @@ export default function ManualTestView({
           body: JSON.stringify({ candidate: candidateSdp }),
         })
           .then((res) => {
-            if (!res.ok && process.env.NODE_ENV === "development") {
+            if (!res.ok && res.status !== 410 && res.status !== 404 && process.env.NODE_ENV === "development") {
               console.warn(`[webrtc] ICE candidate POST returned ${res.status}`);
             }
           })
@@ -694,10 +714,9 @@ export default function ManualTestView({
   const hasVoiceHistory = voiceTimeline.length > 0;
   const showTextBottomBar = activeMode === "text" && textTestConnected;
   const showTextRestartBar = activeMode === "text" && !textTestConnected && hasTextHistory;
-  const showVoiceBottomBar = activeMode === "voice" && voiceState !== "idle";
-  const showVoiceRestartBar = activeMode === "voice" && voiceState === "idle" && hasVoiceHistory;
-  const showBottomBar =
-    showTextBottomBar || showTextRestartBar || showVoiceBottomBar || showVoiceRestartBar;
+  const showVoiceBottomBar = false;
+  const showVoiceRestartBar = false;
+  const showBottomBar = showTextBottomBar || showTextRestartBar;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background relative overflow-hidden">
@@ -712,7 +731,7 @@ export default function ManualTestView({
         onScroll={updateNearBottom}
         className="flex-1 min-h-0 overflow-y-auto custom-scrollbar relative z-10"
       >
-        <div className="max-w-4xl mx-auto px-6 py-4 space-y-4">
+        <div className="w-full h-full flex-1 flex flex-col p-4">
           {/* Main Test Content */}
           {activeMode === "text" ? (
             <div className="space-y-4">
@@ -773,106 +792,73 @@ export default function ManualTestView({
               )}
             </div>
           ) : (
-            <div className="flex flex-col items-center">
-              {hasVoiceHistory ? (
-                <div className="w-full space-y-4">
-                  {voiceTimeline.map((entry, i) => (
-                    <TimelineEntryCard
-                      key={i}
-                      entry={entry}
-                      previousEntries={voiceTimeline}
-                      index={i}
-                    />
-                  ))}
-                </div>
+            <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-2">
+              {voiceState !== "idle" ? (
+                <VoiceConversation
+                  mode={
+                    voiceState === "connecting"
+                      ? "connecting"
+                      : voiceState === "speaking"
+                      ? "speaking"
+                      : voiceState === "processing" || voiceState === "toolcalling"
+                      ? "thinking"
+                      : "listening"
+                  }
+                  amplitude={
+                    measuredVolume > 0
+                      ? measuredVolume
+                      : voiceState === "speaking"
+                      ? 0.65
+                      : voiceState === "listening"
+                      ? 0.45
+                      : 0.1
+                  }
+                  transcript={voiceTimeline
+                    .filter(
+                      (entry): entry is Extract<TimelineEntry, { kind: "message" }> =>
+                        entry.kind === "message"
+                    )
+                    .map((t, idx) => ({
+                      id: `turn-${idx}`,
+                      role: t.role === "user" ? "user" : "assistant",
+                      text: t.text,
+                    }))}
+                  muted={isMuted}
+                  onToggleMute={toggleMute}
+                  onInterrupt={stopVoice}
+                  onEnd={stopVoice}
+                  className="my-auto shadow-2xl"
+                />
               ) : (
-                <div className="flex flex-col items-center justify-center py-24 text-center w-full">
-                  {/* The "Vibe Sphere" */}
-                  <div className="relative mb-8">
-                    <div
-                      className={`absolute inset-0 rounded-full blur-3xl opacity-20 transition-all duration-700 ${
-                        voiceState === "connecting"
-                          ? "bg-muted-foreground animate-pulse"
-                          : voiceState === "listening"
-                            ? "bg-primary animate-pulse"
-                            : voiceState === "processing"
-                              ? "bg-primary/50"
-                              : voiceState === "speaking"
-                                ? "bg-[#D9A700] scale-110"
-                                : "bg-primary/10"
-                      }`}
-                    />
-
-                    <div
-                      className={`relative size-32 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                        voiceState === "idle"
-                          ? "bg-background border-border shadow-sm"
-                          : "bg-background/80 backdrop-blur-sm border-primary/20 shadow-2xl"
-                      }`}
-                    >
-                      {voiceState === "idle" ? (
-                        <HugeiconsIcon
-                          icon={Mic01Icon}
-                          className="size-10 text-muted-foreground/20"
-                        />
-                      ) : (
-                        <div className="relative flex items-center justify-center">
-                          {voiceState === "speaking" && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="size-24 rounded-full border-2 border-primary/10 animate-ping" />
-                            </div>
-                          )}
-                          <div
-                            className={`transition-transform duration-300 ${voiceState === "speaking" ? "scale-110" : "scale-100"}`}
-                          >
-                            {voiceStateMap[voiceState].icon}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                <div className="flex flex-col items-center justify-center py-12 text-center w-full max-w-md">
+                  <div className="mb-6 flex items-center justify-center">
+                    <VoiceOrb state="idle" variant="default" className="scale-110" />
                   </div>
 
-                  <h3 className="text-xl font-bold tracking-tight mb-2">
-                    {voiceState === "idle" ? "Voice Sandbox" : voiceStateMap[voiceState].label}
-                  </h3>
-                  <p className="max-w-[320px] text-xs text-muted-foreground leading-relaxed mb-10">
-                    {voiceState === "idle" ? (
-                      isMissingVoiceId ? (
-                        <span className="text-destructive font-semibold">
-                          No voice selected.
-                          {onGoToConfig && (
-                            <>
-                              {" "}
-                              Go to{" "}
-                              <button
-                                onClick={onGoToConfig}
-                                className="underline underline-offset-2 hover:opacity-80"
-                              >
-                                Voice Settings
-                              </button>{" "}
-                              to configure one.
-                            </>
-                          )}
-                        </span>
-                      ) : (
-                        "Experience high-fidelity conversational AI with low-latency WebRTC streams."
-                      )
+                  <h3 className="text-xl font-bold tracking-tight mb-2">Voice Sandbox</h3>
+                  <p className="max-w-[320px] text-xs text-muted-foreground leading-relaxed mb-8">
+                    {isMissingVoiceId ? (
+                      <span className="text-destructive font-semibold">
+                        No voice selected.{" "}
+                        {onGoToConfig && (
+                          <button
+                            onClick={onGoToConfig}
+                            className="underline underline-offset-2 hover:opacity-80"
+                          >
+                            Configure Voice
+                          </button>
+                        )}
+                      </span>
                     ) : (
-                      "Engaging in a real-time voice session. Speak naturally to interact."
+                      "Experience high-fidelity conversational AI with low-latency WebRTC audio streams."
                     )}
                   </p>
 
-                  {voiceState === "idle" && (
-                    <Button
-                      onClick={startVoice}
-                      size="lg"
-                      className="rounded-xl shadow-lg shadow-primary/10 gap-2 px-8 h-12 transition-all hover:-translate-y-px active:translate-y-0 ring-offset-background"
-                      disabled={!config || isMissingVoiceId}
-                    >
-                      <HugeiconsIcon icon={PlayIcon} className="size-4 fill-current" />
-                      <span className="text-sm font-semibold">Start Session</span>
-                    </Button>
-                  )}
+                  <VoiceControl
+                    state="idle"
+                    onConnect={startVoice}
+                    className="w-full max-w-sm"
+                  />
                 </div>
               )}
             </div>
@@ -883,53 +869,17 @@ export default function ManualTestView({
       {/* Contextual Action Bar */}
       {showBottomBar && (
         <div className="z-30 p-4 bg-transparent pointer-events-none sticky bottom-0">
-          <div
-            className={`max-w-2xl mx-auto w-full pointer-events-auto flex items-center animate-in fade-in slide-in-from-bottom-4 duration-500 ${showTextRestartBar || showVoiceRestartBar ? "" : "bg-card/95 backdrop-blur-xl border border-border/80 rounded-2xl shadow-premium p-1.5"}`}
-          >
+          <div className="max-w-2xl mx-auto w-full pointer-events-auto flex items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
             {showTextBottomBar && (
-              <>
-                <div className="flex-1 relative group pl-3 flex items-center min-h-[40px]">
-                  <textarea
-                    value={textTestMsg}
-                    onChange={(e) => setTextTestMsg(e.target.value)}
-                    onKeyDown={handleTextMsgKeyDown}
-                    placeholder="Type to chat..."
-                    rows={1}
-                    disabled={textTestProcessing}
-                    className="w-full resize-none bg-transparent py-2.5 text-sm leading-[20px] text-foreground outline-none border-none ring-0 focus:ring-0 transition-all placeholder:text-muted-foreground/40 max-h-[140px] disabled:opacity-50 block"
-                    onInput={(e) => {
-                      const el = e.currentTarget;
-                      el.style.height = "40px";
-                      const newHeight = Math.min(el.scrollHeight, 140);
-                      el.style.height = `${newHeight}px`;
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-1.5 pr-1.5">
-                  <Button
-                    size="icon"
-                    onClick={sendTextMsg}
-                    disabled={!textTestMsg.trim() || textTestProcessing}
-                    className="rounded-xl h-10 w-10 shadow-lg shadow-primary/20 shrink-0 transition-all active:scale-95 active:shadow-inner"
-                  >
-                    {textTestProcessing ? (
-                      <Spinner className="size-4" />
-                    ) : (
-                      <HugeiconsIcon icon={ArrowTurnBackwardIcon} className="size-4" />
-                    )}
-                  </Button>
-                  <div className="w-px h-5 bg-border/60 mx-1" />
-                  <Button
-                    onClick={stopTextTest}
-                    variant="ghost"
-                    size="icon"
-                    className="rounded-xl h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 transition-all active:scale-95"
-                    title="End Session"
-                  >
-                    <HugeiconsIcon icon={Cancel01Icon} className="size-5" />
-                  </Button>
-                </div>
-              </>
+              <ChatPanelComposer
+                placeholder="Type to chat..."
+                value={textTestMsg}
+                onChange={setTextTestMsg}
+                onSend={() => sendTextMsg()}
+                onCancel={stopTextTest}
+                loading={textTestProcessing}
+                className="w-full"
+              />
             )}
 
             {showTextRestartBar && (
@@ -1025,61 +975,32 @@ function TimelineEntryCard({
   index: number;
 }) {
   if (entry.kind === "message") {
-    const isUser = entry.role === "user";
-    const isSystem = entry.role === "system";
-    const name = isUser ? "You" : isSystem ? "System" : "Agent";
+    if (entry.role === "user") {
+      return <ChatPanelUserMessage>{entry.text}</ChatPanelUserMessage>;
+    }
+
+    if (entry.role === "system") {
+      return <ChatPanelErrorMessage>{entry.text}</ChatPanelErrorMessage>;
+    }
 
     return (
-      <div
-        className={`group animate-in fade-in slide-in-from-bottom-2 duration-400 fill-mode-both ${isUser ? "ml-12" : "mr-12"}`}
-      >
-        <div className="flex items-center gap-2 mb-1.5 px-1">
-          <div
-            className={`text-[10px] font-bold uppercase tracking-[0.15em] ${isUser ? "text-primary ml-auto" : isSystem ? "text-destructive" : "text-muted-foreground/80"}`}
-          >
-            {name}
-          </div>
-        </div>
-        <div
-          className={`relative px-4 py-3 rounded-2xl border text-sm leading-relaxed shadow-sm transition-shadow hover:shadow-md ${
-            isUser
-              ? "bg-primary text-primary-foreground border-primary/10 rounded-tr-none ml-auto w-fit max-w-[90%]"
-              : isSystem
-                ? "bg-destructive/5 border-destructive/20 text-destructive text-center w-full"
-                : "bg-card/40 backdrop-blur-sm border-border/80 rounded-tl-none w-fit max-w-[90%]"
-          }`}
-        >
-          {entry.text}
-
-          {!isUser && !isSystem && entry.total_turn_ms != null && (
-            <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap items-center gap-y-2 gap-x-4 opacity-70 transition-opacity group-hover:opacity-100">
-              <div className="flex items-center gap-1.5">
-                <HugeiconsIcon icon={FlashIcon} className="size-2.5 text-primary" />
-                <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
-                  {entry.ttft_ms}ms <span className="text-[10px] opacity-60">TTFT</span>
-                </span>
-              </div>
-              {entry.tokens_per_second != null && entry.tokens_per_second > 0 && (
-                <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
-                  <span className="text-foreground">{entry.tokens_per_second}</span>{" "}
-                  <span className="text-[10px] opacity-60">T/S</span>
-                </span>
-              )}
-              <div className="flex-1 min-w-[40px] h-1.5 bg-muted rounded-full overflow-hidden relative">
-                <div
-                  className="absolute inset-y-0 left-0 bg-primary/40 rounded-full transition-all duration-700"
-                  style={{
-                    width: `${Math.min(100, (entry.ttft_ms! / entry.total_turn_ms!) * 100)}%`,
-                  }}
-                />
-              </div>
-              <span className="text-[10px] font-bold text-foreground/80 tabular-nums">
-                {Math.round(entry.total_turn_ms / 100) / 10}s
-              </span>
+      <ChatPanelAssistantMessage agentName="Agent">
+        {entry.text}
+        {entry.total_turn_ms != null && (
+          <div className="mt-2.5 pt-2 border-t border-border/40 flex flex-wrap items-center gap-y-1.5 gap-x-3 text-[10px] text-muted-foreground/80">
+            <div className="flex items-center gap-1">
+              <HugeiconsIcon icon={FlashIcon} className="size-3 text-primary" />
+              <span className="tabular-nums font-mono">{entry.ttft_ms}ms TTFT</span>
             </div>
-          )}
-        </div>
-      </div>
+            {entry.tokens_per_second != null && entry.tokens_per_second > 0 && (
+              <span className="tabular-nums font-mono">{entry.tokens_per_second} T/S</span>
+            )}
+            <span className="tabular-nums font-mono ml-auto font-bold text-foreground/80">
+              {Math.round(entry.total_turn_ms / 100) / 10}s
+            </span>
+          </div>
+        )}
+      </ChatPanelAssistantMessage>
     );
   }
 

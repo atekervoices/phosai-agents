@@ -47,6 +47,8 @@ class Credential(Base):
     provider: Mapped[str] = mapped_column(String(100), nullable=False)
     auth_type: Mapped[str] = mapped_column(String(50), nullable=False)
     encrypted_data: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    organization_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
     # Encryption metadata
     encryption_iv: Mapped[str | None] = mapped_column(Text, nullable=True)

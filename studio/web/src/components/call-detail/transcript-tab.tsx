@@ -4,6 +4,8 @@ import { MessageSquareDashedIcon } from "@hugeicons/core-free-icons";
 import type { TranscriptMessage } from "./types";
 import { formatDateTime } from "./types";
 
+import { FormattedMarkdown } from "@/components/ui/formatted-markdown";
+
 export function TranscriptTab({
   messages,
   activeIndex,
@@ -50,7 +52,11 @@ export function TranscriptTab({
                 {formatDateTime(msg.timestamp)}
               </span>
             </div>
-            <p className="whitespace-pre-wrap text-sm text-foreground">{msg.text}</p>
+            {isUser ? (
+              <p className="whitespace-pre-wrap text-xs text-foreground font-medium">{msg.text}</p>
+            ) : (
+              <FormattedMarkdown content={msg.text} />
+            )}
           </div>
         );
       })}

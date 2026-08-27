@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from app.api.admin import router as admin_router
 from app.api.agents import router as agents_router
 from app.api.builder import router as builder_router
 from app.api.calls import router as calls_router
@@ -21,9 +22,7 @@ from app.api.evaluations import router as evaluations_router
 from app.api.integrations import router as integrations_router
 from app.api.oauth import router as oauth_router
 from app.api.oauth_apps import router as oauth_apps_router
-
 from app.api.phone_numbers import router as phone_numbers_router
-
 from app.api.settings import router as settings_router
 from app.api.voice_session import router as voice_router
 from app.lib import get_settings
@@ -99,6 +98,7 @@ app.add_middleware(
 # ── Authenticated routes (require API key) ───────────────────────
 _auth = [Depends(require_api_key)]
 
+app.include_router(admin_router, prefix="/api")
 app.include_router(agents_router, prefix="/api", dependencies=_auth)
 app.include_router(builder_router, prefix="/api", dependencies=_auth)
 app.include_router(calls_router, prefix="/api", dependencies=_auth)

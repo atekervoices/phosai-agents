@@ -75,12 +75,13 @@ class StorageConfig(BaseModel):
 class AuthConfig(BaseModel):
     """Authentication settings.
 
-    Env vars: AUTH__SECRET_KEY, AUTH__API_KEY, AUTH__ACCESS_TOKEN_EXPIRE_MINUTES
+    Env vars: AUTH__SECRET_KEY, AUTH__API_KEY, AUTH__SUPERADMIN_API_KEY, AUTH__ACCESS_TOKEN_EXPIRE_MINUTES
     """
 
     secret_key: str = "n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s="
     credential_salt: str = "voice-agent-os-credential-vault-v1"
     api_key: str = ""  # Set via AUTH__API_KEY; empty = auth disabled in dev
+    superadmin_api_key: str = ""  # Set via AUTH__SUPERADMIN_API_KEY
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
     algorithm: str = "HS256"
 

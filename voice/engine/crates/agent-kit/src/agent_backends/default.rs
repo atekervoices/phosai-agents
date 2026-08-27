@@ -53,15 +53,16 @@ const SYSTEM_PROMPT_SUFFIX: &str = r#"
 
 ## Output Rules
 
-Your text is spoken aloud by a voice engine. ONLY output natural spoken language.
+ONLY output clear, well-structured natural spoken language.
 NEVER output:
 - XML tags (e.g. `<thinking>`, `<internal>`, `<note>`)
-- Markdown formatting (`**bold**`, `# heading`, `- list`)
-- Internal notes, stage directions, or annotations
-- Parenthetical asides like `(wait for response)` or `(internal: ...)`
+- Internal notes, stage directions, or parenthetical annotations like `(wait for response)`
 
-Verbalize symbols and abbreviations.
-Say "twenty-four dollars per month" instead of "$24/month".
+When providing lists or options, ALWAYS put each point on a NEW line with clear spacing (e.g.
+1. Item one
+2. Item two) so it is easily readable.
+
+Verbalize symbols and abbreviations. Say "twenty-four dollars per month" instead of "$24/month".
 
 ## Tool Usage — CRITICAL
 

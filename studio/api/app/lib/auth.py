@@ -23,7 +23,7 @@ from fastapi.security import APIKeyHeader
 from app.lib import get_settings
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
+_superadmin_key_header = APIKeyHeader(name="X-SuperAdmin-Key", auto_error=False)
 
 
 async def require_api_key(
@@ -55,22 +55,67 @@ async def require_api_key(
     return key
 
 
+async def require_super_admin(
+    request: Request,
+    api_key: str | None = Security(_api_key_header),
+    superadmin_key: str | None = Security(_superadmin_key_header),
+) -> str:
+    """Validate Super-Admin authorization header or key.
 
-if "TenantContext" not in globals():
-    class TenantContext:  # type: ignore[no-redef, unused-ignore]
-        user: Any
-        organization: Any
-        workspace: Any
-        role: str
+    In development mode or when no SUPERADMIN_API_KEY is configured,
+    access is granted for local development testing.
+    """
+    settings = get_settings()
 
-if "require_tenant" not in globals():
-    async def require_tenant() -> Any:  # type: ignore[misc, unused-ignore]
-        return None
+    # In development mode, allow if no superadmin key is set
+    if settings.is_development and settings.auth.superadmin_api_key == "":
+        return "dev-superadmin"
+
+    provided_key = superadmin_key or api_key
+    if not provided_key:
+        raise HTTPException(status_code=403, detail="Super-Admin access required")
+
+    expected_key = settings.auth.superadmin_api_key or settings.auth.api_key
+    if expected_key and not hmac.compare_digest(provided_key, expected_key):
+        raise HTTPException(status_code=403, detail="Invalid Super-Admin key")
+
+    return provided_key
+
+
+from dataclasses import dataclass
+
+@dataclass
+class TenantContext:
+    user_id: str | None = None
+    organization_id: str | None = None
+    role: str = "member"
+
+
+async def require_tenant(
+    request: Request,
+) -> TenantContext:
+    """Extract authenticated user and organization tenant context.
+
+    Parses X-User-Id and X-Organization-Id headers forwarded by Next.js Clerk middleware.
+    """
+    user_id = request.headers.get("X-User-Id")
+    org_id = request.headers.get("X-Organization-Id")
+    role_header = request.headers.get("X-Role", "").lower()
+
+    is_admin = role_header == "admin" or bool(org_id) or (user_id and "admin" in user_id.lower())
+
+    return TenantContext(
+        user_id=user_id,
+        organization_id=org_id,
+        role="admin" if is_admin else "member",
+    )
+
 
 if "get_agent_organization_id" not in globals():
     async def get_agent_organization_id(db: Any, agent_id: Any) -> Any | None:  # type: ignore[misc, unused-ignore]
         return None
 
 
-# Re-usable dependency
+# Re-usable dependencies
 RequireAuth = Depends(require_api_key)
+RequireSuperAdmin = Depends(require_super_admin)

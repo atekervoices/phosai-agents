@@ -41,6 +41,17 @@ async def list_calls(
     query = select(Call, Agent.name).outerjoin(Agent, Agent.id == Call.agent_id)
     count_query = select(sa_func.count(Call.id)).outerjoin(Agent, Agent.id == Call.agent_id)
 
+    if ctx and ctx.role == "admin":
+        pass
+    elif ctx and ctx.organization_id:
+        query = query.where(Call.organization_id == ctx.organization_id)
+        count_query = count_query.where(Call.organization_id == ctx.organization_id)
+    elif ctx and ctx.user_id:
+        user_agents_stmt = select(Agent.id).where(Agent.user_id == ctx.user_id)
+        user_filter = (Call.user_id == ctx.user_id) | (Call.user_id.is_(None)) | (Call.agent_id.in_(user_agents_stmt))
+        query = query.where(user_filter)
+        count_query = count_query.where(user_filter)
+
     effective_agent_ids: list[uuid.UUID] = []
     if agent_ids:
         effective_agent_ids.extend(agent_ids)

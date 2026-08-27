@@ -4,13 +4,14 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { CallHeader } from "@/components/call-detail/call-header";
 import { LogTab } from "@/components/call-detail/log-tab";
 import { CallWaveform } from "@/components/call-detail/call-waveform";
 import { TranscriptTab } from "@/components/call-detail/transcript-tab";
 import { extractTranscriptMessages, parseTranscript } from "@/components/call-detail/types";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   api,
   API_BASE,
@@ -26,12 +27,12 @@ function getAbsoluteUrl(url: string | null | undefined): string | undefined {
 
 type TabKey = "transcript" | "log";
 
-export default function CallDetailPage() {
-  const { workspace_slug } = useParams();
-  const params = useParams<{ id: string }>();
-  const callId = params?.id;
-  const hasValidId = typeof callId === "string" && callId.length > 0;
+function CallDetailPageContent() {
+  const params = useParams();
+  const workspace_slug = (params?.workspace_slug as string) || "default";
+  const callId = (params?.id as string) || "";
 
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [call, setCall] = useState<CallLog | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("transcript");
@@ -42,11 +43,10 @@ export default function CallDetailPage() {
   const [eventsError, setEventsError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasValidId || !callId) {
-      return;
-    }
+    if (!callId) return;
 
     let cancelled = false;
+    setLoading(true);
 
     api.calls
       .get(callId)
@@ -59,6 +59,10 @@ export default function CallDetailPage() {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Failed to load call detail.");
         setCall(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
       });
 
     api.calls
@@ -75,10 +79,10 @@ export default function CallDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [callId, hasValidId]);
+  }, [callId]);
 
   useEffect(() => {
-    if (!hasValidId || !callId || !logCapabilities?.has_internal_logs) return;
+    if (!callId || !logCapabilities?.has_internal_logs) return;
 
     let cancelled = false;
     setTimeout(() => {
@@ -100,32 +104,21 @@ export default function CallDetailPage() {
         if (cancelled) return;
         setEventsLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [callId, hasValidId, logCapabilities?.has_internal_logs]);
+  }, [callId, logCapabilities?.has_internal_logs]);
 
-  const transcriptDoc = useMemo(() => parseTranscript(call?.transcript_json), [call]);
-  const transcriptMessages = useMemo(
-    () => extractTranscriptMessages(transcriptDoc),
-    [transcriptDoc]
+  const parsedTranscript = useMemo(() => parseTranscript(call?.transcript_json), [call]);
+  const audioUrl = useMemo(
+    () => getAbsoluteUrl(parsedTranscript?.audio_url ?? call?.recording_url ?? null),
+    [parsedTranscript, call?.recording_url]
   );
-
-  // ── Transcript ↔ audio alignment ─────────────────────────────────────────
-  //
-  // `offsetSecRaw` in each message is already (message_utc - recording_started_at)
-  // in seconds (see types.ts → extractTranscriptMessages). The audio file's t=0 is
-  // also `recording_started_at`, so both axes share the same origin and no scale or
-  // lead-in correction is needed.
-  //
-  // DO NOT apply a sync-scale (audio_duration / wallclock_duration). The audio file
-  // is legitimately shorter than the wall-clock session because the recording stops
-  // when the last audio packet arrives while the session connection stays alive for a
-  // few more seconds. Scaling by that ratio compresses all timestamps and causes
-  // highlights to drift earlier as the call progresses.
-  //
-  // DO NOT apply a lead-in offset derived from the first message's offsetSecRaw.
-  // Adding it to currentTimeSec shifts the activation window later than it should be.
+  const transcriptMessages = useMemo(
+    () => extractTranscriptMessages(parsedTranscript),
+    [parsedTranscript]
+  );
 
   const activeTranscriptIndex = useMemo(() => {
     let activeIndex = -1;
@@ -160,25 +153,6 @@ export default function CallDetailPage() {
       setTimeout(() => setActiveTab("transcript"), 0);
     }
   }, [activeTab, canShowLogTab, logCapabilities]);
-
-  if (!hasValidId) {
-    return (
-      <div className="space-y-4">
-        <Link href={`/dashboard/${workspace_slug}/calls`}>
-          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
-            <HugeiconsIcon icon={ArrowLeft01Icon} className="size-3.5" />
-            Back to Calls
-          </Button>
-        </Link>
-        <div className="flat-card p-10 text-center">
-          <p className="text-sm text-foreground font-medium">Unable to open call detail</p>
-          <p className="text-sm text-muted-foreground mt-1">Invalid call ID.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const loading = !error && !call;
 
   if (loading) {
     return (
@@ -218,53 +192,39 @@ export default function CallDetailPage() {
         </Link>
       </div>
 
-      <CallHeader call={call} />
+      <CallHeader call={call} langfuseLink={langfuseLink?.url ?? null} />
 
       <CallWaveform
-        key={call.recording_url ?? "no-recording"}
-        recordingUrl={getAbsoluteUrl(call.recording_url) ?? null}
-        fallbackDurationSec={call.duration_seconds}
+        recordingUrl={audioUrl ?? getAbsoluteUrl(call?.recording_url) ?? null}
+        fallbackDurationSec={call?.duration_seconds}
         onTimeUpdate={setCurrentTimeSec}
       />
 
-      <section className="flat-card p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="inline-flex rounded-lg border border-border/50 p-1 bg-secondary/30">
+      <section className="space-y-3">
+        <div className="flex items-center gap-1 border-b border-border/70 pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("transcript")}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              activeTab === "transcript"
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Transcript ({transcriptMessages.length})
+          </button>
+          {canShowLogTab ? (
             <button
               type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === "transcript"
-                  ? "bg-card text-foreground shadow-sm"
+              onClick={() => setActiveTab("log")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                activeTab === "log"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
-              onClick={() => setActiveTab("transcript")}
             >
-              Transcript
+              System Log
             </button>
-            {canShowLogTab ? (
-              <button
-                type="button"
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  activeTab === "log"
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setActiveTab("log")}
-              >
-                Log
-              </button>
-            ) : null}
-          </div>
-
-          {activeTab === "log" && langfuseLink ? (
-            <a
-              href={langfuseLink.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
-            >
-              Also available in LangFuse
-            </a>
           ) : null}
         </div>
 
@@ -282,5 +242,21 @@ export default function CallDetailPage() {
         )}
       </section>
     </div>
+  );
+}
+
+export default function CallDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4">
+          <div className="h-24 rounded-xl bg-secondary/30 animate-pulse" />
+          <div className="h-52 rounded-xl bg-secondary/30 animate-pulse" />
+          <div className="h-64 rounded-xl bg-secondary/30 animate-pulse" />
+        </div>
+      }
+    >
+      <CallDetailPageContent />
+    </Suspense>
   );
 }

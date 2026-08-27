@@ -77,6 +77,7 @@ function VersionBadge({
 }
 
 export default function AgentListItemCard({ agent, href, className }: AgentListItemCardProps) {
+  const targetHref = href || `/dashboard/default/agents/${agent.id}`;
   const description = agent.description?.trim() || "";
   const currentVersion = agent.version_count > 0 ? agent.version_count : null;
   const activeVersion = agent.active_version;
@@ -92,7 +93,7 @@ export default function AgentListItemCard({ agent, href, className }: AgentListI
   const hasExtraDetails = Boolean(description || language || timezone);
 
   return (
-    <Link href={href} className="block">
+    <Link href={targetHref} className="block">
       <div
         className={`group flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3 hover:bg-secondary/50 transition-colors ${
           className ?? ""
@@ -105,7 +106,7 @@ export default function AgentListItemCard({ agent, href, className }: AgentListI
           <div className="min-w-0">
             <p className="truncate text-xs font-medium text-foreground">{agent.name}</p>
             {description ? (
-              <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{description}</p>
             ) : null}
             {language || timezone ? (
               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">

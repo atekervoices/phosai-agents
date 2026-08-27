@@ -58,6 +58,7 @@ import ChatPanel, { type ChatMessage } from "@/components/agent/chat-panel";
 import PreviewPanel, { type PreviewTab } from "@/components/agent/preview-panel";
 import TestPanel from "@/components/agent/test-panel";
 import AgentConfigEditor from "@/components/agent/agent-config-editor";
+import EmbedConfigView from "@/components/agent/embed-config-view";
 import {
   IntegrationConnectionDialog,
   OAuthAppRegistrationDialog,
@@ -120,18 +121,20 @@ function AgentDetailPageContent() {
   const pathname = usePathname();
   const params = useParams();
   const id = (params?.id as string) || "";
-  const workspace_slug = (params?.workspace_slug as string) || "";
+  const workspace_slug = (params?.workspace_slug as string) || "default";
 
   const [agent, setAgent] = useState<Agent | null>(null);
+  const [notFoundError, setNotFoundError] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const tabParam = searchParams ? searchParams.get("tab") : null;
   const [activeTab, setActiveTabInternal] = useState<PreviewTab>(
-    (searchParams.get("tab") as PreviewTab) || "config"
+    (tabParam as PreviewTab) || "config"
   );
 
   const setActiveTab = useCallback(
     (tab: PreviewTab) => {
       setActiveTabInternal(tab);
-      const newParams = new URLSearchParams(searchParams.toString());
+      const newParams = new URLSearchParams(searchParams ? searchParams.toString() : "");
       newParams.set("tab", tab);
       router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
     },
@@ -242,10 +245,17 @@ function AgentDetailPageContent() {
       ]);
     };
 
+    if (!id || id === "new" || id === "import") return;
+
     api.agents
       .get(id)
-      .then(setAgent)
-      .catch(() => {});
+      .then((data) => {
+        setAgent(data);
+        setNotFoundError(false);
+      })
+      .catch((err) => {
+        setNotFoundError(true);
+      });
     void loadVersions();
     void loadCredentials();
     void api.oauthApps
@@ -610,6 +620,27 @@ function AgentDetailPageContent() {
   }, [agent?.name, id]);
 
   // ── Render ────────────────────────────────────────────────────
+
+  if (notFoundError) {
+    return (
+      <div className="flex flex-col flex-1 items-center justify-center min-h-[70vh] bg-background text-foreground p-6 space-y-4 text-center">
+        <div className="size-16 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+          <HugeiconsIcon icon={Robot01Icon} className="size-8" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">Voice Agent Not Found</h2>
+        <p className="text-xs text-muted-foreground max-w-sm">
+          The requested voice agent ID does not exist or has been removed from the database.
+        </p>
+        <Link
+          href={`/dashboard/${workspace_slug || "default"}/agents`}
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+        >
+          <HugeiconsIcon icon={ArrowLeft01Icon} className="size-4" />
+          Back to Voice Agents
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-y-0 right-0 left-60 flex bg-background text-foreground z-30 overflow-hidden">
@@ -1007,6 +1038,11 @@ function AgentDetailPageContent() {
         {/* ── Test ── */}
         {activeTab === "test" && (
           <TestPanel agentId={id} agent={agent} onGoToConfig={() => setActiveTab("config")} />
+        )}
+
+        {/* ── Embed ── */}
+        {activeTab === "embed" && (
+          <EmbedConfigView agentId={id} agentName={agent?.name} />
         )}
       </PreviewPanel>
 

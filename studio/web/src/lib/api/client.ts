@@ -10,7 +10,8 @@
 
 
 const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-export const API_BASE = rawApiUrl.replace("localhost", "127.0.0.1");
+const isBrowser = typeof window !== "undefined";
+export const API_BASE = isBrowser ? "/api-proxy" : rawApiUrl.replace("localhost", "127.0.0.1");
 
 const rawWsUrl =
   process.env.NEXT_PUBLIC_WS_URL ||

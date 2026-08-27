@@ -55,6 +55,8 @@ class Call(Base):
     outcome: Mapped[str | None] = mapped_column(String(50), nullable=True)
     sentiment_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     agent_version_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    organization_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

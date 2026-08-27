@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AiBrain01Icon,
@@ -13,9 +14,9 @@ import {
   Wrench01Icon,
   SquareIcon,
 } from "@hugeicons/core-free-icons";
-import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { formatAgentText } from "@/components/ui/formatted-markdown";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -550,7 +551,7 @@ export default function ChatPanel({
                                 return (
                                   <div key={i}>
                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                      {part.content}
+                                      {formatAgentText(part.content)}
                                     </ReactMarkdown>
                                     {msg.isStreaming && i === parts.length - 1 && (
                                       <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />

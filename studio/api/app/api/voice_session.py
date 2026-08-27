@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import datetime
 import uuid
 from time import perf_counter
 from typing import Any
@@ -26,6 +27,7 @@ from app.lib.config import get_llm_config, get_settings
 from app.lib.database import get_db
 from app.lib.tool_activity import tool_activity_from_runner_event
 from app.models.agent import Agent, AgentVersion
+from app.models.call import Call
 from voice_engine import AgentRunner
 
 router = APIRouter(tags=["voice"])
@@ -339,17 +341,11 @@ async def text_test_socket(
                 continue
             finally:
                 if timed_out:
-                    # Signal the Rust backend to abort the in-flight turn.
-                    # This wakes recv_event() via tokio::select! and calls
-                    # backend.cancel(), dropping the LLM stream and tool
-                    # channels so the background thread exits promptly.
                     cancel_handle.cancel()
                     try:
                         await asyncio.wait_for(runner_task, timeout=5.0)
                     except (TimeoutError, Exception):
                         logger.warning("Text test: runner thread stuck after cancel")
-                    # Rebuild: the timed-out turn wrote partial state into
-                    # the conversation history that the user never saw.
                     runner = _build_runner()
                     cancel_handle = runner.cancel_handle()
                 else:
@@ -395,4 +391,19 @@ async def text_test_socket(
 
             await websocket.send_json({"type": "turn_complete"})
     except WebSocketDisconnect:
+        try:
+            call_log = Call(
+                id=uuid.uuid4(),
+                agent_id=agent.id,
+                user_id=agent.user_id,
+                status="completed",
+                direction="webrtc",
+                duration_seconds=max(5, int(perf_counter() - session_t0)),
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+            db.add(call_log)
+            await db.commit()
+            logger.info("Saved call log session {} for agent {}", call_log.id, agent.id)
+        except Exception as exc:
+            logger.warning("Failed to save call log: {}", exc)
         return

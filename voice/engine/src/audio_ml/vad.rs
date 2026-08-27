@@ -39,9 +39,14 @@ pub struct VadConfig {
 
 impl Default for VadConfig {
     fn default() -> Self {
+        let min_volume = std::env::var("FEROS_VAD_MIN_VOLUME")
+            .ok()
+            .and_then(|v| v.parse::<f32>().ok())
+            .unwrap_or(0.0060);
+
         Self {
             threshold: VAD_THRESHOLD_IDLE,
-            min_volume: 0.0035,
+            min_volume,
             silence_frames: 6,
             min_speech_frames: 6, // Increased from 3 (96ms) to 6 (192ms) to filter pops/echo
             lookback_frames: 20,
@@ -205,6 +210,16 @@ impl SileroVad {
         }
         let rms = (sum_sq / n_samples as f32).sqrt();
         self.volume = self.volume + 0.2 * (rms - self.volume);
+
+        // Fast RMS energy pre-gate: short-circuit ONNX inference if frame volume is below min_volume
+        if rms < self.config.min_volume && self.volume < self.config.min_volume && !self.is_speaking {
+            self.speech_frame_count = 0;
+            self.lookback_buffer.push(frame.to_vec());
+            if self.lookback_buffer.len() > self.config.lookback_frames {
+                self.lookback_buffer.remove(0);
+            }
+            return None;
+        }
 
         let prob = match self.infer(frame) {
             Ok(p) => p,

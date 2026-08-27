@@ -8,7 +8,7 @@ import {
   Robot01Icon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { api, type Agent } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -17,9 +17,9 @@ import AgentListItemCard from "@/components/agent/agent-list-item-card";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 
-
-export default function AgentsPage() {
-  const { workspace_slug } = useParams();
+function AgentsPageContent() {
+  const params = useParams();
+  const workspace_slug = (params?.workspace_slug as string) || "default";
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -41,19 +41,11 @@ export default function AgentsPage() {
     else setLoadingMore(true);
 
     try {
-      const data = await api.agents.list(currentSkip, limit);
-      if (isInitial) {
-        setAgents(data.agents);
-      } else {
-        setAgents((prev) => {
-          // ensure no duplicates just in case
-          const newAgents = data.agents.filter((a) => !prev.some((p) => p.id === a.id));
-          return [...prev, ...newAgents];
-        });
-      }
-      setHasMore(currentSkip + data.agents.length < data.total);
-    } catch (e) {
-      console.error("Failed to load agents", e);
+      const data = await api.agents.list(currentSkip, limit, debouncedSearchQuery || undefined);
+      setAgents((prev) => (isInitial ? data.agents : [...prev, ...data.agents]));
+      setHasMore(data.agents.length === limit);
+    } catch {
+      // ignore
     } finally {
       if (isInitial) setLoading(false);
       else setLoadingMore(false);
@@ -61,25 +53,28 @@ export default function AgentsPage() {
   };
 
   useEffect(() => {
+    setSkip(0);
     loadAgents(0, true);
-  }, []);
+  }, [debouncedSearchQuery]);
 
   useEffect(() => {
     const handleScroll = () => {
       if (
         window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 100
+          document.documentElement.offsetHeight - 200 &&
+        hasMore &&
+        !loadingMore &&
+        !loading
       ) {
-        if (!loading && !loadingMore && hasMore) {
-          const nextSkip = skip + limit;
-          setSkip(nextSkip);
-          loadAgents(nextSkip, false);
-        }
+        const nextSkip = skip + limit;
+        setSkip(nextSkip);
+        loadAgents(nextSkip);
       }
     };
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [loading, loadingMore, hasMore, skip]);
+  }, [hasMore, loadingMore, loading, skip, debouncedSearchQuery]);
 
   return (
     <div className="space-y-6">
@@ -89,7 +84,7 @@ export default function AgentsPage() {
           title="Agents"
           description="Create, search, and manage your voice agents."
         />
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <div className="relative group hidden md:block">
             <HugeiconsIcon
               icon={Search01Icon}
@@ -124,12 +119,14 @@ export default function AgentsPage() {
         </div>
       ) : agents.length === 0 ? (
         <div className="py-16 text-center">
-          <div className="inline-flex items-center justify-center size-14 rounded-xl bg-primary/8 mb-4">
+          <div className="inline-flex items-center justify-center size-14 rounded-xl bg-primary/10 mb-4">
             <HugeiconsIcon icon={Robot01Icon} className="size-6 text-primary" />
           </div>
-          <p className="text-sm font-medium text-foreground mb-1">No agents yet</p>
-          <p className="text-sm text-muted-foreground max-w-[280px] mx-auto mb-5">
-            Create your first voice agent to start handling calls.
+          <p className="text-sm font-medium text-foreground mb-1">No agents found</p>
+          <p className="text-xs text-muted-foreground max-w-[280px] mx-auto mb-5">
+            {debouncedSearchQuery
+              ? `No voice agents match "${debouncedSearchQuery}". Try clearing your search.`
+              : "Create your first voice agent to start handling calls."}
           </p>
           <Link href={`/dashboard/${workspace_slug}/agents/new`}>
             <Button size="sm" className="h-8 rounded-lg px-5 text-xs font-medium gap-1.5">
@@ -158,5 +155,20 @@ export default function AgentsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AgentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <div className="h-20 rounded-xl bg-secondary/30 animate-pulse" />
+          <div className="h-44 rounded-xl bg-secondary/30 animate-pulse" />
+        </div>
+      }
+    >
+      <AgentsPageContent />
+    </Suspense>
   );
 }

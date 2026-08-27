@@ -87,7 +87,8 @@ impl SttProvider for CanarySttProvider {
             std::mem::take(&mut *buf)
         };
 
-        if pcm.is_empty() {
+        // Discard audio segments shorter than 350ms (11,200 bytes at 16kHz Int16 PCM) as noise blips
+        if pcm.len() < 11_200 {
             if let Some(tx) = &self.result_tx {
                 let tx_clone = tx.clone();
                 tokio::spawn(async move {
@@ -122,8 +123,23 @@ impl SttProvider for CanarySttProvider {
                                 .unwrap_or("")
                                 .trim();
 
-                            info!("[canary-stt] Transcript: \"{text}\"");
-                            let _ = tx.send(SttEvent::Transcript(text.to_string())).await;
+                            let lower = text.to_lowercase();
+                            let clean_text = if lower.contains("subtitles by")
+                                || lower.contains("amara.org")
+                                || lower.contains("community subtitles")
+                                || lower.contains("thank you for watching")
+                                || lower.contains("subscribe to my channel")
+                                || lower == "."
+                                || lower == "-"
+                            {
+                                info!("[canary-stt] Suppressed hallucination: \"{text}\"");
+                                ""
+                            } else {
+                                text
+                            };
+
+                            info!("[canary-stt] Transcript: \"{clean_text}\"");
+                            let _ = tx.send(SttEvent::Transcript(clean_text.to_string())).await;
                         }
                         Err(err) => {
                             warn!("[canary-stt] Failed to parse JSON response: {err}");

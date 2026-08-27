@@ -7,10 +7,11 @@ import {
   ConnectIcon,
   Settings05Icon,
   WorkflowSquare10Icon,
+  GlobeIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
-export type PreviewTab = "flow" | "config" | "credentials" | "test";
+export type PreviewTab = "flow" | "config" | "credentials" | "test" | "embed";
 
 interface PreviewPanelProps {
   activeTab: PreviewTab;
@@ -29,6 +30,7 @@ const tabs: {
   { key: "flow", label: "Flow", icon: WorkflowSquare10Icon },
   { key: "credentials", label: "Connections", icon: ConnectIcon },
   { key: "test", label: "Test", icon: HeadsetIcon },
+  { key: "embed", label: "Embed", icon: GlobeIcon },
 ];
 
 export default function PreviewPanel({

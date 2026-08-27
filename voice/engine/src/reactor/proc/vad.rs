@@ -5,9 +5,14 @@
 //! Speech audio is accumulated inside `SileroVad` and yielded on SpeechEnd.
 
 use bytes::Bytes;
+use tracing::info;
 
 use crate::audio_ml::vad::{SileroVad, VadConfig, VadEvent as InnerVadEvent};
 use crate::types::VadEvent;
+
+/// Minimum valid speech segment length to trigger ASR (350ms at 16kHz Int16 PCM = 11,200 bytes).
+/// Audio shorter than 350ms (mic clicks, breaths, table bumps) is discarded as noise.
+const MIN_SPEECH_BYTES: usize = 11_200;
 
 pub struct VadStage {
     inner: SileroVad,
@@ -40,7 +45,8 @@ impl VadStage {
             Some(InnerVadEvent::SpeechStart) => Some(VadEvent::SpeechStarted),
             Some(InnerVadEvent::SpeechEnd) => {
                 let audio = Bytes::from(self.inner.take_speech_audio());
-                if audio.is_empty() {
+                if audio.len() < MIN_SPEECH_BYTES {
+                    info!("[vad] Discarded short noise blip ({}ms)", audio.len() / 32);
                     None
                 } else {
                     Some(VadEvent::SpeechEnded(audio))
@@ -56,7 +62,7 @@ impl VadStage {
         if self.inner.is_speaking() {
             self.inner.force_speech_end();
             let audio = Bytes::from(self.inner.take_speech_audio());
-            if audio.is_empty() {
+            if audio.len() < MIN_SPEECH_BYTES {
                 None
             } else {
                 Some(VadEvent::SpeechEnded(audio))

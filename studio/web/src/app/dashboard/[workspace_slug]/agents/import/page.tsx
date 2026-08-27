@@ -17,7 +17,7 @@ import {
   TwoCircleIcon,
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, Suspense } from "react";
 import { useRouter, useParams } from "next/navigation";
 
 import { ImportConfigInput } from "@/components/agent/import-config-input";
@@ -47,8 +47,9 @@ const STEP_ITEMS = [
   { step: 3 as Step, label: "Agent Metadata", icon: ThreeCircleIcon },
 ];
 
-export default function ImportAgentPage() {
-  const { workspace_slug } = useParams();
+function ImportAgentPageContent() {
+  const params = useParams();
+  const workspace_slug = (params?.workspace_slug as string) || "default";
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
@@ -519,5 +520,13 @@ function isAgentFullConfig(value: unknown): value is AgentFullConfig {
     typeof candidate.config === "object" &&
     candidate.config !== null &&
     !Array.isArray(candidate.config)
+  );
+}
+
+export default function ImportAgentPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading...</div>}>
+      <ImportAgentPageContent />
+    </Suspense>
   );
 }

@@ -57,6 +57,8 @@ class PhoneNumber(Base):
         nullable=True,
         index=True,
     )
+    user_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    organization_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
     # Per-number snapshot of the voice-server URL used on the last successful assignment.
     voice_server_url: Mapped[str | None] = mapped_column(

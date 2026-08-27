@@ -123,12 +123,8 @@ export function CallWaveform({
 
       {!recordingUrl ? (
         <Unavailable text="No recording is available for this call." />
-      ) : compatibilityError ? (
-        <Unavailable text={compatibilityError} />
-      ) : loadError ? (
-        <Unavailable text={loadError} />
       ) : (
-        <>
+        <div className="space-y-3">
           <div className="rounded-lg border border-border/40 bg-secondary/20 p-3">
             <div ref={containerRef} />
           </div>
@@ -149,7 +145,7 @@ export function CallWaveform({
             </Button>
             <p className="text-xs text-muted-foreground">Click anywhere on the waveform to seek.</p>
           </div>
-        </>
+        </div>
       )}
     </section>
   );

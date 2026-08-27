@@ -85,6 +85,25 @@ async def list_agents(
     base_query = select(Agent)
     count_query = select(sa_func.count(Agent.id))
 
+    is_admin = ctx.role == "admin" if ctx else False
+
+    if is_admin:
+        # Admin receives all agents
+        pass
+    elif ctx and ctx.organization_id:
+        tenant_filter = or_(Agent.organization_id == ctx.organization_id, Agent.organization_id.is_(None))
+        base_query = base_query.where(tenant_filter)
+        count_query = count_query.where(tenant_filter)
+    elif ctx and ctx.user_id:
+        user_filter = Agent.user_id == ctx.user_id
+        base_query = base_query.where(user_filter)
+        count_query = count_query.where(user_filter)
+    else:
+        # Unauthenticated / Dev fallback (when X-User-Id is not present): return only unassigned/legacy agents
+        unassigned_filter = Agent.user_id.is_(None)
+        base_query = base_query.where(unassigned_filter)
+        count_query = count_query.where(unassigned_filter)
+
     q_value = q.strip() if q else ""
     if q_value:
         name_filter = Agent.name.ilike(f"%{q_value}%")
@@ -156,7 +175,12 @@ async def create_agent(
     db: AsyncSession = Depends(get_db),
 ) -> AgentResponse:
     """Create a new agent and its initial builder conversation."""
-    agent = Agent(name=body.name, description=body.description)
+    agent = Agent(
+        name=body.name,
+        description=body.description,
+        user_id=ctx.user_id if ctx else None,
+        organization_id=ctx.organization_id if ctx else None,
+    )
 
     db.add(agent)
     await db.flush()
@@ -491,10 +515,21 @@ async def list_tts_models(language: str | None = None) -> list[dict[str, Any]]:
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(
     agent_id: uuid.UUID,
+    ctx: TenantContext | None = Depends(require_tenant),
     db: AsyncSession = Depends(get_db),
 ) -> AgentResponse:
     """Get a single agent with its current config."""
-    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    is_admin = ctx.role == "admin" if ctx else False
+    query = select(Agent).where(Agent.id == agent_id)
+    if not is_admin:
+        if ctx and ctx.organization_id:
+            query = query.where(or_(Agent.organization_id == ctx.organization_id, Agent.organization_id.is_(None)))
+        elif ctx and ctx.user_id:
+            query = query.where(or_(Agent.user_id == ctx.user_id, Agent.user_id.is_(None)))
+        else:
+            query = query.where(Agent.user_id.is_(None))
+
+    result = await db.execute(query)
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -540,7 +575,17 @@ async def update_agent(
     ctx: TenantContext | None = Depends(require_tenant),
 ) -> AgentResponse:
     """Update agent metadata (name, description, status, phone number)."""
-    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    is_admin = ctx.role == "admin" if ctx else False
+    query = select(Agent).where(Agent.id == agent_id)
+    if not is_admin:
+        if ctx and ctx.organization_id:
+            query = query.where(or_(Agent.organization_id == ctx.organization_id, Agent.organization_id.is_(None)))
+        elif ctx and ctx.user_id:
+            query = query.where(or_(Agent.user_id == ctx.user_id, Agent.user_id.is_(None)))
+        else:
+            query = query.where(Agent.user_id.is_(None))
+
+    result = await db.execute(query)
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -577,10 +622,21 @@ async def update_agent(
 @router.delete("/{agent_id}", status_code=204)
 async def delete_agent(
     agent_id: uuid.UUID,
+    ctx: TenantContext | None = Depends(require_tenant),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete an agent and all its versions, conversations, and calls."""
-    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    is_admin = ctx.role == "admin" if ctx else False
+    query = select(Agent).where(Agent.id == agent_id)
+    if not is_admin:
+        if ctx and ctx.organization_id:
+            query = query.where(or_(Agent.organization_id == ctx.organization_id, Agent.organization_id.is_(None)))
+        elif ctx and ctx.user_id:
+            query = query.where(or_(Agent.user_id == ctx.user_id, Agent.user_id.is_(None)))
+        else:
+            query = query.where(Agent.user_id.is_(None))
+
+    result = await db.execute(query)
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")

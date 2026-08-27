@@ -13,8 +13,8 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: voice-agent-os
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ferosdev}
+      POSTGRES_USER: ${POSTGRES_USER:-voice-agent-os}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-voice_agent}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -22,7 +22,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U voice-agent-os -d $${POSTGRES_DB:-voice_agent}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voice-agent-os} -d $${POSTGRES_DB:-voice_agent}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -36,11 +36,14 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE__URL: ${DATABASE__URL:-postgresql://voice-agent-os:${POSTGRES_PASSWORD:-ferosdev}@db:5432/${POSTGRES_DB:-voice_agent}}
-      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY:-n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s=}
-      ENVIRONMENT: development
+      DATABASE__URL: ${DATABASE__URL:-postgresql://${POSTGRES_USER:-voice-agent-os}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voice_agent}}
+      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY}
+      AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
       OPENAI_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     volumes:
       - ./studio/api:/app
       - recordings:/recordings
@@ -67,8 +70,8 @@ services:
       - "8300:8300"
       - "50000:50000/udp"
     environment:
-      DATABASE__URL: ${DATABASE__URL:-postgresql://voice-agent-os:${POSTGRES_PASSWORD:-ferosdev}@db:5432/${POSTGRES_DB:-voice_agent}}
-      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY:-n4tdUP80bCKerLNVf7eHMjTnlpatHcz1SFcKfBuvl1s=}
+      DATABASE__URL: ${DATABASE__URL:-postgresql://${POSTGRES_USER:-voice-agent-os}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voice_agent}}
+      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY}
       SERVER__LISTEN_HOST: 0.0.0.0
       SERVER__LISTEN_PORT: 8300
       WEBRTC__UDP_PORT: 50000
@@ -83,8 +86,13 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       STT_PROVIDER: ${STT_PROVIDER:-phosai-stt}
-      STT_BASE_URL: ${STT_BASE_URL:-ws://control.atekervoices.com/control}
-      STT_MODEL: ${STT_MODEL:-phosai-realtime}
+      STT_BASE_URL: ${STT_BASE_URL:-https://speaches.atekervoices.com/v1}
+      STT_MODEL: ${STT_MODEL:-Achuka/etoil-whisper-stt}
+      STT_API_KEY: ${STT_API_KEY:-}
+      PHOSAI_STT_CONTROL_URL: ${PHOSAI_STT_CONTROL_URL:-ws://stt-control.atekervoices.com/control}
+      PHOSAI_STT_DATA_URL: ${PHOSAI_STT_DATA_URL:-ws://stt-data.atekervoices.com/data}
+      PHOSAI_SILERO_SENSITIVITY: ${PHOSAI_SILERO_SENSITIVITY:-0.55}
+      PHOSAI_SILENCE_DURATION: ${PHOSAI_SILENCE_DURATION:-0.60}
       TTS_PROVIDER: ${TTS_PROVIDER:-phosai-ws}
       TTS_BASE_URL: ${TTS_BASE_URL:-https://tts.atekervoices.com}
       TTS_MODEL: ${TTS_MODEL:-spark-tts}
@@ -111,6 +119,14 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
       BACKEND_API_URL: http://studio-api:8000
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-/dashboard}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/dashboard}
+      AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
+      STUDIO_SUPERADMIN_API_KEY: ${STUDIO_SUPERADMIN_API_KEY:-}
       WATCHPACK_POLLING: "true"
       HOSTNAME: "0.0.0.0"
       PORT: "3000"

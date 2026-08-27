@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::providers::ws::{ManagedWsConnection, WsConfig, WsKeepalive, WsStatus};
 use crate::types::SttEvent;
@@ -82,8 +82,8 @@ fn resolve_phosai_urls(base_url: &str) -> (String, String, String) {
         }
     } else {
         (
-            env_control.unwrap_or_else(|| "wss://control.atekervoices.com/control".to_string()),
-            env_data.unwrap_or_else(|| "wss://data.atekervoices.com/data".to_string()),
+            env_control.unwrap_or_else(|| "wss://stt-control.atekervoices.com/control".to_string()),
+            env_data.unwrap_or_else(|| "wss://stt-data.atekervoices.com/data".to_string()),
         )
     };
 
@@ -232,6 +232,7 @@ pub struct PhosAiSttProvider {
     control_conn_tx: Option<mpsc::UnboundedSender<Message>>,
     data_conn_tx: Option<mpsc::UnboundedSender<Message>>,
     result_rx: Option<mpsc::Receiver<SttEvent>>,
+    audio_buffer: Arc<Mutex<Vec<u8>>>,
 }
 
 impl PhosAiSttProvider {
@@ -265,6 +266,7 @@ impl PhosAiSttProvider {
             control_conn_tx: None,
             data_conn_tx: None,
             result_rx: None,
+            audio_buffer: Arc::new(Mutex::new(Vec::with_capacity(4096))),
         }
     }
 
@@ -384,31 +386,31 @@ impl SttProvider for PhosAiSttProvider {
         .to_string();
         let _ = control_msg_tx.send(Message::Text(lang_cmd.into()));
 
-        // Set silence timeout if specified in env
-        if let Ok(silence_val) = std::env::var("PHOSAI_SILENCE_DURATION") {
-            if let Ok(val) = silence_val.parse::<f64>() {
-                let silence_cmd = serde_json::json!({
-                    "command": "set_parameter",
-                    "parameter": "post_speech_silence_duration",
-                    "value": val
-                })
-                .to_string();
-                let _ = control_msg_tx.send(Message::Text(silence_cmd.into()));
-            }
-        }
+        // Set post-speech silence duration (default 0.60s)
+        let silence_val = std::env::var("PHOSAI_SILENCE_DURATION")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.60);
+        let silence_cmd = serde_json::json!({
+            "command": "set_parameter",
+            "parameter": "post_speech_silence_duration",
+            "value": silence_val
+        })
+        .to_string();
+        let _ = control_msg_tx.send(Message::Text(silence_cmd.into()));
 
-        // Set VAD sensitivity if specified in env
-        if let Ok(sens_val) = std::env::var("PHOSAI_SILERO_SENSITIVITY") {
-            if let Ok(val) = sens_val.parse::<f64>() {
-                let sens_cmd = serde_json::json!({
-                    "command": "set_parameter",
-                    "parameter": "silero_sensitivity",
-                    "value": val
-                })
-                .to_string();
-                let _ = control_msg_tx.send(Message::Text(sens_cmd.into()));
-            }
-        }
+        // Set VAD sensitivity (default 0.55 for balanced speech detection)
+        let sens_val = std::env::var("PHOSAI_SILERO_SENSITIVITY")
+            .ok()
+            .and_then(|s| s.parse::<f64>().ok())
+            .unwrap_or(0.55);
+        let sens_cmd = serde_json::json!({
+            "command": "set_parameter",
+            "parameter": "silero_sensitivity",
+            "value": sens_val
+        })
+        .to_string();
+        let _ = control_msg_tx.send(Message::Text(sens_cmd.into()));
 
         let (result_tx, result_rx) = mpsc::channel::<SttEvent>(32);
         self.control_conn_tx = Some(control_msg_tx);
@@ -447,6 +449,7 @@ impl SttProvider for PhosAiSttProvider {
                                     let _ = result_tx.send(SttEvent::FirstTextReceived).await;
                                 }
                                 if !cleaned.is_empty() {
+                                    info!("[phosai-stt] Realtime hypothesis: {:?}", cleaned);
                                     last_transcript = cleaned.clone();
                                     let _ = result_tx
                                         .send(SttEvent::PartialTranscript(cleaned))
@@ -487,10 +490,7 @@ impl SttProvider for PhosAiSttProvider {
                             }
                         }
                         Err(e) => {
-                            warn!(
-                                "[phosai-stt] Error parsing Data WS message: {} — raw: {}",
-                                e, text
-                            );
+                            info!("[phosai-stt] Data WS msg parse failed for '{}': {}", text, e);
                         }
                     }
                 }

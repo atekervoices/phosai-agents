@@ -60,7 +60,11 @@ export type TimelineEvent = TranscriptChunkEvent | TranscriptEvent;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function isOpenBubble(entry: TimelineEntry, role: string): entry is MessageTimelineEntry {
+function isMessageEntry(entry: TimelineEntry): entry is MessageTimelineEntry {
+  return entry.kind === "message";
+}
+
+function isOpenBubble(entry: TimelineEntry, role: string): boolean {
   return entry.kind === "message" && entry.role === role && !entry._final;
 }
 
@@ -79,7 +83,9 @@ export function applyChunk(prev: TimelineEntry[], event: TranscriptChunkEvent): 
   if (last && isOpenBubble(last, role)) {
     // Append to existing open bubble — no length change.
     const updated = [...prev];
-    updated[updated.length - 1] = { ...last, text: last.text + text };
+    const lastIdx = prev.length - 1;
+    const msg = last as MessageTimelineEntry;
+    updated[lastIdx] = { ...msg, text: msg.text + text };
     return updated;
   }
 
@@ -103,13 +109,16 @@ export function applyTranscript(prev: TimelineEntry[], event: TranscriptEvent): 
   if (last && isOpenBubble(last, role)) {
     // Replace streaming bubble with the canonical text and close it.
     const updated = [...prev];
-    updated[lastIdx] = { ...last, text, _final: true };
+    const msg = last as MessageTimelineEntry;
+    updated[lastIdx] = { ...msg, text, _final: true };
     return updated;
   }
 
   // Deduplicate exact consecutive transcript messages
-  if (last && last.kind === "message" && last.role === role && last.text === text) {
-    return prev;
+  if (last && isMessageEntry(last)) {
+    if (last.role === role && last.text === text) {
+      return prev;
+    }
   }
 
   // Classic pipeline or first bubble: just append a new closed entry.

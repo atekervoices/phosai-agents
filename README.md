@@ -65,7 +65,7 @@ flowchart LR
 **Requirements:** Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/ferosai/feros.git
+git clone https://github.com/atekervoices/phosai-agents.git
 cd feros
 cp .env.example .env
 
