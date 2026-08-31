@@ -77,10 +77,9 @@ pub async fn resolve_secrets(
          FROM credentials c
          JOIN agents a ON a.id = $1
          WHERE c.agent_id = $1
-            OR (c.agent_id IS NULL AND c.workspace_id = a.workspace_id)
+            OR (c.agent_id IS NULL AND (c.organization_id = a.organization_id OR c.organization_id IS NULL))
          ORDER BY
             c.agent_id NULLS LAST,
-            c.workspace_id NULLS LAST,
             c.created_at DESC";
 
     let rows = sqlx::query_as::<_, CredentialRow>(query)
