@@ -3,48 +3,14 @@
     auto_https off
 }
 
-# ── Port 80 (HTTP / Cloudflare Flexible & Full proxy) ──────────
-:80 {
-    @agents host agents.phosaico.com studio.phosaico.com
-    handle @agents {
-        reverse_proxy studio-web:3000
-    }
-
-    @api host api.phosaico.com
-    handle @api {
-        reverse_proxy studio-api:8000
-    }
-
-    @voice host voice.phosaico.com
-    handle @voice {
-        reverse_proxy voice-server:8300
-    }
-
-    handle {
-        reverse_proxy studio-web:3000
-    }
+http://voice.phosaico.com, https://voice.phosaico.com {
+    reverse_proxy voice-server:8300
 }
 
-# ── Port 443 (HTTPS / Cloudflare Full & Strict proxy) ─────────
-:443 {
-    tls internal
+http://api.phosaico.com, https://api.phosaico.com {
+    reverse_proxy studio-api:8000
+}
 
-    @agents host agents.phosaico.com studio.phosaico.com
-    handle @agents {
-        reverse_proxy studio-web:3000
-    }
-
-    @api host api.phosaico.com
-    handle @api {
-        reverse_proxy studio-api:8000
-    }
-
-    @voice host voice.phosaico.com
-    handle @voice {
-        reverse_proxy voice-server:8300
-    }
-
-    handle {
-        reverse_proxy studio-web:3000
-    }
+http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
+    reverse_proxy studio-web:3000
 }
