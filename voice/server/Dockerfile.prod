@@ -28,9 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     patch \
     && rm -rf /var/lib/apt/lists/*
 
-# Pin toolchain version for reproducible builds (updated to 1.91.1 for dependency compatibility).
+# Install Rust (stable toolchain)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --default-toolchain 1.91.1 --profile minimal
+    | sh -s -- -y --default-toolchain stable --profile minimal
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Neutralise any rustc-wrapper=sccache set in .cargo/config.toml — sccache

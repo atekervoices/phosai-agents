@@ -7,6 +7,7 @@ export type TranscriptMessage = {
 };
 
 export type TranscriptDoc = {
+  audio_url?: string | null;
   started_at: string | null;
   ended_at: string | null;
   wallclockDurationSec: number | null;
@@ -21,6 +22,8 @@ export function parseTranscript(raw: unknown): TranscriptDoc | null {
   const entriesRaw = raw.entries;
   if (!Array.isArray(entriesRaw)) return null;
 
+  const audioUrl =
+    typeof raw.audio_url === "string" && raw.audio_url.length > 0 ? raw.audio_url : null;
   const startedAt =
     typeof raw.started_at === "string" && raw.started_at.length > 0 ? raw.started_at : null;
   const endedAt = typeof raw.ended_at === "string" && raw.ended_at.length > 0 ? raw.ended_at : null;
@@ -36,6 +39,7 @@ export function parseTranscript(raw: unknown): TranscriptDoc | null {
 
   const entries = entriesRaw.filter(isObject);
   return {
+    audio_url: audioUrl,
     started_at: startedAt,
     ended_at: endedAt,
     wallclockDurationSec,
