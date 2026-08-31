@@ -17,7 +17,13 @@ import { useParams } from "next/navigation";
 import type { CallLog } from "@/lib/api/client";
 import { formatDateTime, formatDuration } from "./types";
 
-export function CallHeader({ call }: { call: CallLog }) {
+export function CallHeader({
+  call,
+  langfuseLink,
+}: {
+  call: CallLog;
+  langfuseLink?: string | null;
+}) {
   const { workspace_slug } = useParams<{ workspace_slug: string }>();
   const occurredAt = call.started_at ?? call.created_at;
   const [copied, setCopied] = useState(false);
@@ -57,6 +63,18 @@ export function CallHeader({ call }: { call: CallLog }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {langfuseLink && (
+            <a
+              href={langfuseLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center hover:text-primary gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-foreground transition-colors hover:bg-primary/10"
+              title="Open Trace in Langfuse"
+            >
+              <HugeiconsIcon icon={InformationCircleIcon} className="size-3.5" />
+              <span>Trace</span>
+            </a>
+          )}
           <Link
             href={`/dashboard/${workspace_slug}/agents/${call.agent_id}`}
             className="inline-flex max-w-60 items-center hover:text-primary gap-2 rounded-md bg-secondary px-3 py-2 text-xs text-foreground transition-colors hover:bg-primary/10"
