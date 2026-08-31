@@ -124,6 +124,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ))}
         </nav>
 
+        {/* Footer */}
+        <div className="p-3 border-t border-sidebar-border space-y-2">
           {isClerkEnabled && (
             <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-sidebar-muted/60 border border-sidebar-border/40">
               <div

@@ -171,8 +171,7 @@ async fn main() {
 
     // CORS — outermost so all routes inherit it
     let cors = {
-        let origins_str = std::env::var("ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "*".to_string());
+        let origins_str = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| "*".to_string());
 
         if origins_str.trim() == "*" {
             info!("CORS: permissive (ALLOWED_ORIGINS=*)");

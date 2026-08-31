@@ -561,15 +561,45 @@ async fn agent_config_for_id(
         llm_model,
         llm_base_url,
         llm_api_key: llm_key,
-        stt_provider: if stt.provider.is_empty() { std::env::var("STT_PROVIDER").unwrap_or_else(|_| "phosai-stt".to_string()) } else { stt.provider.clone() },
-        stt_model: if stt.model.is_empty() { std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-realtime".to_string()) } else { stt.model.clone() },
-        stt_base_url: if stt.base_url.is_empty() { std::env::var("STT_BASE_URL").unwrap_or_else(|_| "ws://stt-control.atekervoices.com/control".to_string()) } else { stt.base_url.clone() },
+        stt_provider: if stt.provider.is_empty() {
+            std::env::var("STT_PROVIDER").unwrap_or_else(|_| "phosai-stt".to_string())
+        } else {
+            stt.provider.clone()
+        },
+        stt_model: if stt.model.is_empty() {
+            std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-realtime".to_string())
+        } else {
+            stt.model.clone()
+        },
+        stt_base_url: if stt.base_url.is_empty() {
+            std::env::var("STT_BASE_URL")
+                .unwrap_or_else(|_| "ws://stt-control.atekervoices.com/control".to_string())
+        } else {
+            stt.base_url.clone()
+        },
         stt_api_key: stt.resolved_api_key(engine),
-        tts_provider: if tts.provider.is_empty() { std::env::var("TTS_PROVIDER").unwrap_or_else(|_| "phosai-ws".to_string()) } else { tts.provider.clone() },
-        tts_model: if tts.model.is_empty() { std::env::var("TTS_MODEL").unwrap_or_else(|_| "spark-tts".to_string()) } else { tts.model.clone() },
-        tts_base_url: if tts.base_url.is_empty() { std::env::var("TTS_BASE_URL").unwrap_or_else(|_| "https://tts.atekervoices.com".to_string()) } else { tts.base_url.clone() },
+        tts_provider: if tts.provider.is_empty() {
+            std::env::var("TTS_PROVIDER").unwrap_or_else(|_| "phosai-ws".to_string())
+        } else {
+            tts.provider.clone()
+        },
+        tts_model: if tts.model.is_empty() {
+            std::env::var("TTS_MODEL").unwrap_or_else(|_| "spark-tts".to_string())
+        } else {
+            tts.model.clone()
+        },
+        tts_base_url: if tts.base_url.is_empty() {
+            std::env::var("TTS_BASE_URL")
+                .unwrap_or_else(|_| "https://tts.atekervoices.com".to_string())
+        } else {
+            tts.base_url.clone()
+        },
         tts_api_key: tts.resolved_api_key(engine),
-        tts_voice_id: if tts.voice_id.is_empty() { std::env::var("TTS_VOICE_ID").unwrap_or_else(|_| "pcm_female_1".to_string()) } else { tts.voice_id.clone() },
+        tts_voice_id: if tts.voice_id.is_empty() {
+            std::env::var("TTS_VOICE_ID").unwrap_or_else(|_| "pcm_female_1".to_string())
+        } else {
+            tts.voice_id.clone()
+        },
         native_multimodal_model: native_multimodal.model.clone(),
         native_multimodal_api_key: native_multimodal.resolved_api_key(engine),
     })
