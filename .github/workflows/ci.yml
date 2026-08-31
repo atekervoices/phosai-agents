@@ -76,6 +76,10 @@ jobs:
         working-directory: studio/web
         run: pnpm run lint
 
+      - name: Typecheck Studio Web
+        working-directory: studio/web
+        run: pnpm exec tsc --noEmit
+
   api-check:
     name: FastAPI Lint & Test
     runs-on: ubuntu-latest
