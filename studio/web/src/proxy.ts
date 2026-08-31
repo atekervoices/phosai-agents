@@ -73,6 +73,7 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
     orgId = authObj.orgId ?? null;
     const sessionClaims = authObj.sessionClaims;
     const publicRole = String((sessionClaims as any)?.metadata?.role || (sessionClaims as any)?.publicMetadata?.role || "").toLowerCase();
+    const userEmail = String((sessionClaims as any)?.email || (sessionClaims as any)?.email_address || "");
     const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.CLERK_SECRET_KEY);
     const adminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || "simonallanachuka@gmail.com").toLowerCase();
     const isDev = process.env.NODE_ENV !== "production";

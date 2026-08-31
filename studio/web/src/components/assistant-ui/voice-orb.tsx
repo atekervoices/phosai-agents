@@ -8,6 +8,7 @@ export type VoiceOrbState =
   | "connecting"
   | "listening"
   | "speaking"
+  | "thinking"
   | "muted";
 
 export type VoiceOrbVariant = "default" | "blue" | "violet" | "emerald" | (string & {});

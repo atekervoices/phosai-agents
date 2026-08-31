@@ -5,12 +5,13 @@ type LogoProps = React.ComponentProps<"div">;
 
 export function FerosLogo({ className, ...props }: LogoProps) {
   return (
-    <img
-      src="/phosai_logo.png"
-      alt="PhosAI"
-      className={cn("h-8 w-8 object-contain shrink-0", className)}
-      {...props}
-    />
+    <div className={cn("inline-flex shrink-0 items-center justify-center", className)} {...props}>
+      <img
+        src="/phosai_logo.png"
+        alt="PhosAI"
+        className="h-8 w-8 object-contain shrink-0"
+      />
+    </div>
   );
 }
 
