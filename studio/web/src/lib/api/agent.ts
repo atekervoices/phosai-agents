@@ -106,9 +106,11 @@ export interface AgentGraphDef {
   /** Session recording configuration */
   recording?: RecordingConfig | undefined;
   /** Envelope field for versions (e.g. "v3_graph") */
-  config_schema_version?: string | undefined;
+  config_schema_version?:
+    | string
+    | undefined;
   /** Pre-configured escalation destinations for the escalate_call tool */
-  escalation_destinations?: EscalationDestination[];
+  escalation_destinations: EscalationDestination[];
   /**
    * -- Native multimodal (Gemini Live) --
    * When set, the session bypasses STT/LLM/TTS and uses Gemini Live's native

@@ -13,22 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-and-test:
-    name: Lint, Test & Schema Sync
+  proto-check:
+    name: Protobuf & Schema Verification
     runs-on: ubuntu-latest
-    env:
-      RUSTC_WRAPPER: sccache
-      SCCACHE_GHA_ENABLED: "true"
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies (protoc)
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
 
-      # pnpm must be installed BEFORE setup-node so that
-      # setup-node can detect the pnpm store path for caching.
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
@@ -41,53 +37,104 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'studio/web/pnpm-lock.yaml'
 
-      - name: Cache Cargo Registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
-
-      - name: Cache Python venv
-        uses: actions/cache@v5
-        with:
-          path: studio/api/.venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('studio/api/uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-venv-
-
-      - name: Install Python dependencies
-        working-directory: studio/api
-        run: uv sync
-
-      - name: Install Web dependencies
+      - name: Install Web dependencies (for protoc-gen-ts_proto)
         working-directory: studio/web
         run: pnpm install --frozen-lockfile
 
       - name: Generate Proto Stubs & Verify Schema Sync
         run: |
           make proto
-          git diff --exit-code || (echo "Generated protobuf or agent schema stubs are out of date. Please run 'make proto' locally and commit the changes." && exit 1)
+          git diff --exit-code || (echo "Generated protobuf stubs are out of sync. Please commit generated files." && exit 1)
 
-      - name: Run Lint Suite
-        run: make lint
+  web-check:
+    name: Next.js Web Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Run Unit Tests
-        run: make test
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: 'studio/web/pnpm-lock.yaml'
+
+      - name: Install Web dependencies
+        working-directory: studio/web
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Studio Web
+        working-directory: studio/web
+        run: pnpm run lint
+
+  api-check:
+    name: FastAPI Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install Python dependencies
+        working-directory: studio/api
+        run: uv sync
+
+      - name: Lint Python API
+        working-directory: studio/api
+        run: uv run ruff check app/
+
+      - name: Run Python API Tests
+        working-directory: studio/api
+        run: uv run pytest tests/ -v
+
+  rust-check:
+    name: Rust Voice Server & Engine Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (protoc & opus)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libopus-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache (Speed up compilation)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            voice/server
+            voice/engine
+            integrations
+
+      - name: Rust Format Check
+        run: |
+          cd voice/server && cargo fmt --check
+          cd ../engine && cargo fmt --check
+          cd ../../integrations && cargo fmt --check
+
+      - name: Clippy Lint
+        run: |
+          cd voice/server && cargo clippy -- -D warnings
+          cd ../engine && cargo clippy -- -D warnings
+          cd ../../integrations && cargo clippy -- -D warnings
+
+      - name: Run Rust Tests
+        run: |
+          cd voice/server && cargo test
+          cd ../engine && cargo test
+          cd ../../integrations && cargo test
