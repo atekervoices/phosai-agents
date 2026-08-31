@@ -657,7 +657,15 @@ export default function ManualTestView({
       iceCandidateBuffer.length = 0;
 
       // 14. Connect WebSocket for UI events (transcripts, state, tools)
-      const ws = new WebSocket(ws_url);
+      let resolvedWsUrl = ws_url;
+      if (isHttpsPage) {
+        if (resolvedWsUrl.startsWith("ws://109.123.244.46:8300")) {
+          resolvedWsUrl = resolvedWsUrl.replace("ws://109.123.244.46:8300", "wss://voice.phosaico.com");
+        } else if (resolvedWsUrl.startsWith("ws://")) {
+          resolvedWsUrl = resolvedWsUrl.replace(/^ws:\/\//, "wss://");
+        }
+      }
+      const ws = new WebSocket(resolvedWsUrl);
       wsRef.current = ws;
       ws.onmessage = handleWsMsg;
       ws.onerror = () => {
