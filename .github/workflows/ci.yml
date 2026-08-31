@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   lint-and-test:
-    name: Lint and Test
+    name: Lint, Test & Schema Sync
     runs-on: ubuntu-latest
     env:
       RUSTC_WRAPPER: sccache
@@ -63,8 +63,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          # uv resolves Python from pyproject.toml requires-python;
-          # no separate setup-python step needed.
           python-version: "3.12"
 
       - name: Cache Python venv
@@ -83,11 +81,13 @@ jobs:
         working-directory: studio/web
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Proto Stubs
-        run: make proto
+      - name: Generate Proto Stubs & Verify Schema Sync
+        run: |
+          make proto
+          git diff --exit-code || (echo "Generated protobuf or agent schema stubs are out of date. Please run 'make proto' locally and commit the changes." && exit 1)
 
-      - name: Run Lint
+      - name: Run Lint Suite
         run: make lint
 
-      - name: Run Tests
+      - name: Run Unit Tests
         run: make test

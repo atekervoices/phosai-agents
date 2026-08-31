@@ -1,0 +1,135 @@
+name: Continuous Deployment (CD)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - 'production'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: studio-api
+            context: .
+            dockerfile: studio/api/Dockerfile
+            image_name: feros-studio-api
+          - name: voice-server
+            context: .
+            dockerfile: voice/server/Dockerfile
+            image_name: feros-voice-server
+          - name: studio-web
+            context: .
+            dockerfile: studio/web/Dockerfile
+            image_name: feros-studio-web
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image_name }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=${{ matrix.image_name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image_name }}
+
+  deploy:
+    name: Deploy to Server via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && !failure() }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Remote VM over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          TARGET_DIR: ${{ secrets.PROD_TARGET_DIR || '/root/feros' }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER || 'root' }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT || 22 }}
+          envs: TARGET_DIR,GHCR_USER,GHCR_PAT
+          script: |
+            set -e
+            echo "── Navigating to deployment directory ──"
+            cd "$TARGET_DIR"
+
+            echo "── Pulling latest code changes ──"
+            git pull origin main || git pull origin master
+
+            echo "── Authenticating Docker to GHCR ──"
+            echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
+
+            echo "── Pulling latest container images ──"
+            docker compose pull
+
+            echo "── Running Database Migrations ──"
+            docker compose run --rm studio-api uv run alembic upgrade head || true
+
+            echo "── Restarting Containers ──"
+            docker compose up -d --remove-orphans
+
+            echo "── Running Post-Deployment Health Check ──"
+            timeout 60 bash -c '
+              until curl -sf http://localhost:8000/api/health > /dev/null 2>&1; do
+                echo "Waiting for Studio API health check on port 8000..."
+                sleep 3
+              done
+            '
+            echo "✓ Deployment successful and services are healthy!"

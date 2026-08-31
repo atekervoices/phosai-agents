@@ -1,0 +1,42 @@
+name: Agent Evaluation & Tool Verification
+
+on:
+  pull_request:
+    paths:
+      - 'proto/**'
+      - 'studio/api/app/schemas/**'
+      - 'studio/api/app/tools/**'
+      - 'studio/api/app/agents/**'
+      - 'studio/api/tests/**'
+      - 'voice/engine/**'
+  workflow_dispatch:
+
+jobs:
+  agent-eval:
+    name: Agent Schema & Tool Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (protoc)
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        working-directory: studio/api
+        run: uv sync
+
+      - name: Validate Agent Proto & Schema Generation
+        run: |
+          make proto
+          git diff --exit-code || (echo "Agent schema mismatch detected! Run 'make proto' locally." && exit 1)
+
+      - name: Run Agent Tool & Integration Tests
+        working-directory: studio/api
+        run: uv run pytest tests/ -v -k "agent or tool" || uv run pytest tests/ -v
