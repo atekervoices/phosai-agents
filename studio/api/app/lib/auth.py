@@ -14,6 +14,7 @@ strings differ, eliminating that signal.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hmac
 from typing import Any
 
@@ -81,8 +82,6 @@ async def require_super_admin(
 
     return provided_key
 
-
-from dataclasses import dataclass
 
 @dataclass
 class TenantContext:

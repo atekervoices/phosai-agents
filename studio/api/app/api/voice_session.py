@@ -234,6 +234,8 @@ async def text_test_socket(
         }
     )
 
+    session_t0 = perf_counter()
+
     try:
         while True:
             raw = await websocket.receive_text()

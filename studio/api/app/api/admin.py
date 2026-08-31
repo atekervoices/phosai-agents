@@ -7,7 +7,7 @@ import os
 from typing import Any
 import httpx
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,6 @@ from app.lib.config import get_settings
 from app.lib.database import get_db
 from app.models.agent import Agent
 from app.models.call import Call
-from app.models.call_event import CallEvent
 from app.models.credential import Credential
 from app.models.phone_number import PhoneNumber
 
@@ -80,9 +79,6 @@ async def get_admin_overview(
     }
 
 
-from fastapi import APIRouter, Depends, Query, Request
-
-
 @router.get("/users")
 async def get_admin_users(
     request: Request,
@@ -98,16 +94,17 @@ async def get_admin_users(
         sa_func.count(Agent.id).label("agent_count")
     ).group_by(Agent.user_id)
     db_res = await db.execute(agent_counts_stmt)
-    agent_counts_map = {str(r.user_id): r.agent_count for r in db_res.all() if r.user_id}
+    agent_counts_map = {row[0]: row[1] for row in db_res.all() if row[0]}
 
-    users = []
+    users: list[dict[str, Any]] = []
 
+    # Fetch users from Clerk if secret is set
     if clerk_secret:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
                     "https://api.clerk.com/v1/users?limit=100",
-                    headers={"Authorization": f"Bearer {clerk_secret}"}
+                    headers={"Authorization": f"Bearer {clerk_secret}"},
                 )
                 if resp.status_code == 200:
                     clerk_users = resp.json()
@@ -146,7 +143,7 @@ async def get_admin_users(
                             "status": "BANNED" if u.get("banned") else "ACTIVE",
                             "created_at": created_str,
                         })
-        except Exception as e:
+        except Exception:
             pass
 
     # Fallback if no Clerk users returned or Clerk is disabled
@@ -285,7 +282,6 @@ async def get_admin_analytics(
     """Get dynamic database-backed analytics for call volume, latency, and provider distribution."""
     days = 30 if timeframe == "30d" else (90 if timeframe == "90d" else 7)
     now = datetime.datetime.now(datetime.timezone.utc)
-    start_date = now - datetime.timedelta(days=days)
 
     # 1. Call Volume Trend grouped by date from actual DB records
     days_data = []
