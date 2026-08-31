@@ -517,8 +517,11 @@ export default function ManualTestView({
       streamRef.current = stream;
       setActiveStream(stream);
 
-      // 2. Create session directly on voice-server (no Python needed)
-      const voiceBase = latestVoiceServerUrl;
+      // 2. Create session directly on voice-server (or through HTTPS api-proxy if page is HTTPS)
+      const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:";
+      const shouldUseProxy = isHttpsPage && (latestVoiceServerUrl.startsWith("http://") || !latestVoiceServerUrl.startsWith("https://"));
+      const voiceBase = shouldUseProxy ? "/api-proxy" : latestVoiceServerUrl;
+
       const res = await fetch(`${voiceBase}/voice/session/${id}`, {
         method: "POST",
       });
@@ -534,7 +537,9 @@ export default function ManualTestView({
       // session as a plain WS session and RTC offer will fail.
 
       // 4. Derive HTTP base from voice server for RTC offer
-      const rtcBase = voiceBase.replace(/^wss?:\/\//, "https://").replace(/^ws:\/\//, "http://");
+      const rtcBase = shouldUseProxy
+        ? "/api-proxy"
+        : voiceBase.replace(/^wss?:\/\//, "https://").replace(/^ws:\/\//, "http://");
 
       // 5. Fetch ICE server config from voice-server
       let iceServers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];

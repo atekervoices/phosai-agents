@@ -21,6 +21,17 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
   }
 
   if (req.nextUrl.pathname.startsWith("/api-proxy/")) {
+    // 1. Direct proxy to Rust voice-server for sessions and WebRTC signaling
+    if (req.nextUrl.pathname.startsWith("/api-proxy/voice/") || req.nextUrl.pathname.startsWith("/api-proxy/rtc/")) {
+      const voiceServerBase = process.env.INTERNAL_VOICE_SERVER_URL || process.env.VOICE_SERVER_URL || "http://voice-server:8300";
+      const subpath = req.nextUrl.pathname.replace(/^\/api-proxy/, "");
+      const targetUrl = new URL(subpath.startsWith("/") ? subpath.slice(1) : subpath, voiceServerBase.endsWith("/") ? voiceServerBase : `${voiceServerBase}/`);
+      targetUrl.search = req.nextUrl.search;
+      return NextResponse.rewrite(targetUrl, {
+        request: { headers: req.headers },
+      });
+    }
+
     let userId: string | null = null;
     let orgId: string | null = null;
     let isAdmin = false;
