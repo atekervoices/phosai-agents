@@ -111,6 +111,24 @@ services:
     depends_on:
       - studio-api
 
+  # Caddy automated reverse proxy & SSL gateway
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - studio-web
+      - studio-api
+      - voice-server
+
 volumes:
   pgdata:
   recordings:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,18 @@
+{
+    admin off
+}
+
+# Studio Web Dashboard
+http://agents.phosaico.com, https://agents.phosaico.com, :80 {
+    reverse_proxy studio-web:3000
+}
+
+# FastAPI Backend
+http://api.phosaico.com, https://api.phosaico.com {
+    reverse_proxy studio-api:8000
+}
+
+# Rust Voice Server (HTTP, WebSockets, WebRTC signaling)
+http://voice.phosaico.com, https://voice.phosaico.com {
+    reverse_proxy voice-server:8300
+}
