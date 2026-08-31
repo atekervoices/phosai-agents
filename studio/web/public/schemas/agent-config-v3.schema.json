@@ -59,7 +59,7 @@
     "$schema": {
       "const": "https://feros.ai/schemas/agent-config-v3.schema.json",
       "default": "https://feros.ai/schemas/agent-config-v3.schema.json",
-      "description": "Canonical JSON Schema URL for this payload format.",
+      "description": "Canonical schema URI \u2014 must match exactly for v3 payloads.",
       "title": "$Schema",
       "type": "string"
     },
@@ -241,6 +241,22 @@
         },
         "config_schema_version": {
           "type": "string"
+        },
+        "escalation_destinations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "phone_number": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Protobuf Message: EscalationDestination"
+          }
         },
         "gemini_live_model": {
           "type": "string"
