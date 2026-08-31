@@ -517,10 +517,12 @@ export default function ManualTestView({
       streamRef.current = stream;
       setActiveStream(stream);
 
-      // 2. Create session directly on voice-server (or through HTTPS api-proxy if page is HTTPS)
+      // 2. Create session directly on voice-server via same-origin gateway
       const isHttpsPage = typeof window !== "undefined" && window.location.protocol === "https:";
-      const shouldUseProxy = isHttpsPage && (latestVoiceServerUrl.startsWith("http://") || !latestVoiceServerUrl.startsWith("https://"));
-      const voiceBase = shouldUseProxy ? "/api-proxy" : latestVoiceServerUrl;
+      const originHost = typeof window !== "undefined" ? window.location.origin : "";
+      const voiceBase = isHttpsPage
+        ? originHost
+        : (latestVoiceServerUrl || originHost);
 
       const res = await fetch(`${voiceBase}/voice/session/${id}`, {
         method: "POST",
@@ -537,9 +539,7 @@ export default function ManualTestView({
       // session as a plain WS session and RTC offer will fail.
 
       // 4. Derive HTTP base from voice server for RTC offer
-      const rtcBase = shouldUseProxy
-        ? "/api-proxy"
-        : voiceBase.replace(/^wss?:\/\//, "https://").replace(/^ws:\/\//, "http://");
+      const rtcBase = isHttpsPage ? originHost : voiceBase.replace(/^wss?:\/\//, "https://").replace(/^ws:\/\//, "http://");
 
       // 5. Fetch ICE server config from voice-server
       let iceServers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
@@ -561,12 +561,10 @@ export default function ManualTestView({
       const pc = new RTCPeerConnection({ iceServers });
       pcRef.current = pc;
 
-      // 7. Explicitly add a bidirectional audio transceiver, then attach the primary mic track.
-      // addTrack will reuse the transceiver's sender (per WebRTC spec §4.2.2).
-      // We only add the first track to prevent multiple transceivers if the stream has multiple.
-      pc.addTransceiver("audio", { direction: "sendrecv" });
-      const firstTrack = stream.getAudioTracks()[0];
-      if (firstTrack) pc.addTrack(firstTrack, stream);
+      // 7. Add local audio tracks
+      for (const track of stream.getAudioTracks()) {
+        pc.addTrack(track, stream);
+      }
 
       // 8. Handle incoming audio track from server
       pc.ontrack = (e) => {
@@ -580,17 +578,13 @@ export default function ManualTestView({
           const mediaStream =
             e.streams && e.streams.length > 0 ? e.streams[0] : new MediaStream([e.track]);
           audio.srcObject = mediaStream;
-          audio.play().catch((err) => {
-            console.warn("[voice] audio.play() auto-play error, retrying on user interaction:", err);
-          });
+          if (audio.paused) {
+            audio.play().catch(() => {});
+          }
         }
       };
 
       // Handle Trickle ICE candidates.
-      // Candidates are buffered until after the offer POST resolves and
-      // setRemoteDescription is called, because the server only inserts the
-      // session into hybrid_sessions at the end of rtc_create_session.
-      // Sending candidates before that window closes causes a guaranteed 404.
       const iceCandidateBuffer: string[] = [];
       let offerComplete = false;
 
@@ -611,32 +605,29 @@ export default function ManualTestView({
           });
       };
 
-      pc.onicecandidate = (event) => {
-        if (event.candidate && event.candidate.candidate) {
-          if (offerComplete) {
-            sendIceCandidate(event.candidate.candidate);
-          } else {
-            iceCandidateBuffer.push(event.candidate.candidate);
-          }
+      pc.onicecandidate = (e) => {
+        if (!e.candidate || !e.candidate.candidate) return;
+        if (!offerComplete) {
+          iceCandidateBuffer.push(e.candidate.candidate);
+          return;
         }
+        sendIceCandidate(e.candidate.candidate);
       };
 
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === "failed") {
-          console.warn("[webrtc] ICE connection failed — WebRTC UDP media path unreachable");
-        }
-      };
+      // 9. Create offer
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false,
+      });
 
-      // 9. Create SDP offer
-      const offer = await pc.createOffer();
+      // 10. Set local description
       await pc.setLocalDescription(offer);
 
-      // 10. Send SDP offer to voice-server immediately (Trickle ICE enabled)
-      const rtcUrl = `${rtcBase}/rtc/offer/${session_id}?token=${token}`;
-      const rtcRes = await fetch(rtcUrl, {
+      // 11. Send offer to voice-server
+      const rtcRes = await fetch(`${rtcBase}/rtc/offer/${session_id}?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offer }),
+        body: JSON.stringify({ sdp: offer.sdp, type: offer.type }),
       });
 
       const rtcData = await rtcRes.json();
@@ -649,7 +640,6 @@ export default function ManualTestView({
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
       // 13. Drain buffered ICE candidates now that the server session is live
-      //     and setRemoteDescription has been applied locally.
       offerComplete = true;
       for (const c of iceCandidateBuffer) {
         sendIceCandidate(c);
@@ -658,11 +648,16 @@ export default function ManualTestView({
 
       // 14. Connect WebSocket for UI events (transcripts, state, tools)
       let resolvedWsUrl = ws_url;
-      if (isHttpsPage) {
-        if (resolvedWsUrl.startsWith("ws://109.123.244.46:8300")) {
-          resolvedWsUrl = resolvedWsUrl.replace("ws://109.123.244.46:8300", "wss://voice.phosaico.com");
-        } else if (resolvedWsUrl.startsWith("ws://")) {
-          resolvedWsUrl = resolvedWsUrl.replace(/^ws:\/\//, "wss://");
+      if (typeof window !== "undefined") {
+        const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsHost = window.location.host;
+        try {
+          const parsed = new URL(ws_url.replace(/^wss?:/, "http:"));
+          resolvedWsUrl = `${wsProto}//${wsHost}${parsed.pathname}${parsed.search}`;
+        } catch {
+          if (isHttpsPage && resolvedWsUrl.startsWith("ws://")) {
+            resolvedWsUrl = resolvedWsUrl.replace(/^ws:\/\//, "wss://");
+          }
         }
       }
       const ws = new WebSocket(resolvedWsUrl);

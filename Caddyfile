@@ -3,14 +3,22 @@
     auto_https off
 }
 
-http://voice.phosaico.com, https://voice.phosaico.com {
-    reverse_proxy voice-server:8300
-}
-
-http://api.phosaico.com, https://api.phosaico.com {
-    reverse_proxy studio-api:8000
-}
-
+# Unified single-domain gateway for agents.phosaico.com
 http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
-    reverse_proxy studio-web:3000
+    # 1. Rust Voice Server: WebSockets, WebRTC signaling & session endpoints
+    @voice path /ws/* /voice/* /rtc/* /telephony/*
+    handle @voice {
+        reverse_proxy voice-server:8300
+    }
+
+    # 2. FastAPI Backend API
+    @api path /api/*
+    handle @api {
+        reverse_proxy studio-api:8000
+    }
+
+    # 3. Next.js Web Studio Frontend
+    handle {
+        reverse_proxy studio-web:3000
+    }
 }
