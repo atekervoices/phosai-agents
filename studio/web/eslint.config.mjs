@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "warn",
       "unused-imports/no-unused-imports": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/exhaustive-deps": "warn",
       "unused-imports/no-unused-vars": [
         "warn",
         {
