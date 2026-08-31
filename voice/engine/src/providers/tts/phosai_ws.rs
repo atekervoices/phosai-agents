@@ -503,13 +503,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_phosai_ws_audio_stream() {
-        let mut provider = PhosaiWsTtsProvider::new("https://tts.atekervoices.com", 16000, "pcm_female_1");
+        let mut provider =
+            PhosaiWsTtsProvider::new("https://tts.atekervoices.com", 16000, "pcm_female_1");
         let conn_res = provider.connect("test_session").await;
-        assert!(conn_res.is_ok(), "Failed to connect to Phosai WS TTS: {:?}", conn_res.err());
+        assert!(
+            conn_res.is_ok(),
+            "Failed to connect to Phosai WS TTS: {:?}",
+            conn_res.err()
+        );
 
-        let mut rx = provider.take_audio_rx().expect("audio_rx should be present");
+        let mut rx = provider
+            .take_audio_rx()
+            .expect("audio_rx should be present");
 
-        provider.send_text("Hello, this is a live audio test from the Rust voice engine.", "ctx1", true).await;
+        provider
+            .send_text(
+                "Hello, this is a live audio test from the Rust voice engine.",
+                "ctx1",
+                true,
+            )
+            .await;
         provider.flush("ctx1").await;
 
         let mut total_bytes = 0;
@@ -532,7 +545,13 @@ mod tests {
             }
         }
 
-        println!("[TEST] Total PCM audio bytes received from Phos AI WS TTS: {}", total_bytes);
-        assert!(total_bytes > 0, "No audio bytes received from Phos AI WS TTS!");
+        println!(
+            "[TEST] Total PCM audio bytes received from Phos AI WS TTS: {}",
+            total_bytes
+        );
+        assert!(
+            total_bytes > 0,
+            "No audio bytes received from Phos AI WS TTS!"
+        );
     }
 }
