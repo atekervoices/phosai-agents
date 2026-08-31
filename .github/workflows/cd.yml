@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Images
+    name: Build Production Docker Images
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,11 +37,11 @@ jobs:
             image_name: feros-studio-api
           - name: voice-server
             context: .
-            dockerfile: voice/server/Dockerfile
+            dockerfile: voice/server/Dockerfile.prod
             image_name: feros-voice-server
           - name: studio-web
             context: .
-            dockerfile: studio/web/Dockerfile
+            dockerfile: studio/web/Dockerfile.prod
             image_name: feros-studio-web
 
     steps:
@@ -71,7 +71,7 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
+      - name: Build and push Production Docker image
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
@@ -80,11 +80,11 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-          cache-from: type=gha,scope=${{ matrix.image_name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image_name }}
+          cache-from: type=gha,scope=${{ matrix.image_name }}-prod
+          cache-to: type=gha,mode=max,scope=${{ matrix.image_name }}-prod
 
   deploy:
-    name: Deploy to Server via SSH
+    name: Deploy Production Stack via SSH
     needs: build-and-push
     runs-on: ubuntu-latest
     if: ${{ !cancelled() && !failure() }}
@@ -93,7 +93,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy to Remote VM over SSH
+      - name: Deploy Production Stack to Remote VM
         uses: appleboy/ssh-action@v1.0.3
         env:
           TARGET_DIR: ${{ secrets.PROD_TARGET_DIR || '/root/feros' }}
@@ -110,20 +110,20 @@ jobs:
             echo "── Navigating to deployment directory ──"
             cd "$TARGET_DIR"
 
-            echo "── Pulling latest code changes ──"
+            echo "── Pulling latest code and production configs ──"
             git pull origin main || git pull origin master
 
             echo "── Authenticating Docker to GHCR ──"
             echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
 
-            echo "── Pulling latest container images ──"
-            docker compose pull
+            echo "── Pulling latest production container images ──"
+            docker compose -f docker-compose.prod.yml pull
 
             echo "── Running Database Migrations ──"
-            docker compose run --rm studio-api uv run alembic upgrade head || true
+            docker compose -f docker-compose.prod.yml run --rm studio-api uv run alembic upgrade head || true
 
-            echo "── Restarting Containers ──"
-            docker compose up -d --remove-orphans
+            echo "── Restarting Production Containers ──"
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             echo "── Running Post-Deployment Health Check ──"
             timeout 60 bash -c '
@@ -132,4 +132,4 @@ jobs:
                 sleep 3
               done
             '
-            echo "✓ Deployment successful and services are healthy!"
+            echo "✓ Production deployment successful and services are healthy!"

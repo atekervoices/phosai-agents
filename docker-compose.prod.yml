@@ -1,0 +1,116 @@
+name: feros-voice-agent-os
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voice-agent-os}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-voice_agent}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-voice-agent-os} -d $${POSTGRES_DB:-voice_agent}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  studio-api:
+    image: ghcr.io/${IMAGE_NAMESPACE:-atekervoices}/feros-studio-api:latest
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE__URL: ${DATABASE__URL:-postgresql://${POSTGRES_USER:-voice-agent-os}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voice_agent}}
+      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY}
+      AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
+      ENVIRONMENT: production
+      OPENAI_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    volumes:
+      - recordings:/recordings
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  voice-server:
+    image: ghcr.io/${IMAGE_NAMESPACE:-atekervoices}/feros-voice-server:latest
+    restart: always
+    ports:
+      - "8300:8300"
+      - "50000:50000/udp"
+    environment:
+      DATABASE__URL: ${DATABASE__URL:-postgresql://${POSTGRES_USER:-voice-agent-os}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-voice_agent}}
+      AUTH__SECRET_KEY: ${AUTH__SECRET_KEY}
+      SERVER__LISTEN_HOST: 0.0.0.0
+      SERVER__LISTEN_PORT: 8300
+      WEBRTC__UDP_PORT: 50000
+      WEBRTC__PUBLIC_IP: ${WEBRTC__PUBLIC_IP:-}
+      TELNYX__PUBLIC_KEY: ${TELNYX__PUBLIC_KEY:-}
+      VOICE_SERVER__PUBLIC_URL: ${VOICE_SERVER__PUBLIC_URL}
+      ALLOWED_ORIGINS: "*"
+      RUST_LOG: voice_server=info,voice_engine=info,agent_kit=info
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      STT_PROVIDER: ${STT_PROVIDER:-phosai-stt}
+      STT_BASE_URL: ${STT_BASE_URL:-https://speaches.atekervoices.com/v1}
+      STT_MODEL: ${STT_MODEL:-Achuka/etoil-whisper-stt}
+      STT_API_KEY: ${STT_API_KEY:-}
+      PHOSAI_STT_CONTROL_URL: ${PHOSAI_STT_CONTROL_URL:-ws://stt-control.atekervoices.com/control}
+      PHOSAI_STT_DATA_URL: ${PHOSAI_STT_DATA_URL:-ws://stt-data.atekervoices.com/data}
+      PHOSAI_SILERO_SENSITIVITY: ${PHOSAI_SILERO_SENSITIVITY:-0.55}
+      PHOSAI_SILENCE_DURATION: ${PHOSAI_SILENCE_DURATION:-0.60}
+      TTS_PROVIDER: ${TTS_PROVIDER:-phosai-ws}
+      TTS_BASE_URL: ${TTS_BASE_URL:-https://tts.atekervoices.com}
+      TTS_MODEL: ${TTS_MODEL:-spark-tts}
+      TTS_VOICE_ID: ${TTS_VOICE_ID:-pcm_female_1}
+      RECORDING__OUTPUT_URI: "file:///recordings"
+    volumes:
+      - recordings:/recordings
+    depends_on:
+      db:
+        condition: service_healthy
+      studio-api:
+        condition: service_healthy
+
+  studio-web:
+    image: ghcr.io/${IMAGE_NAMESPACE:-atekervoices}/feros-studio-web:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_VOICE_SERVER_URL: ${VOICE_SERVER__PUBLIC_URL}
+      BACKEND_API_URL: http://studio-api:8000
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-/dashboard}
+      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/dashboard}
+      AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
+      STUDIO_SUPERADMIN_API_KEY: ${STUDIO_SUPERADMIN_API_KEY:-}
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+    depends_on:
+      - studio-api
+
+volumes:
+  pgdata:
+  recordings:
