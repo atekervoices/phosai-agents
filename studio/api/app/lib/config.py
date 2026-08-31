@@ -241,17 +241,12 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: list[str] = Field(
         default_factory=lambda: [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://studio-web:3000",
-            "http://109.123.244.46:3000",
-            "http://109.123.244.46:8000",
-            "http://109.123.244.46:8300",
-            "http://109.123.244.46",
-            "https://agents.phosaico.com",
-            "https://studio.phosaico.com",
-            "https://api.phosaico.com",
-            "https://voice.phosaico.com",
+            o.strip()
+            for o in os.getenv(
+                "ALLOWED_ORIGINS",
+                "http://localhost:3000,http://127.0.0.1:3000,http://studio-web:3000,https://agents.phosaico.com,https://studio.phosaico.com,https://api.phosaico.com,https://voice.phosaico.com",
+            ).split(",")
+            if o.strip()
         ]
     )
 
