@@ -232,6 +232,7 @@ pub struct PhosAiSttProvider {
     control_conn_tx: Option<mpsc::UnboundedSender<Message>>,
     data_conn_tx: Option<mpsc::UnboundedSender<Message>>,
     result_rx: Option<mpsc::Receiver<SttEvent>>,
+    #[allow(dead_code)]
     audio_buffer: Arc<Mutex<Vec<u8>>>,
 }
 

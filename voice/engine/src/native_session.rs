@@ -247,8 +247,10 @@ pub(crate) async fn run_native_multimodal(
                                 }
                             }
                             let samples: Vec<i16> = frame
-                                .chunks_exact(2)
-                                .map(|b| i16::from_le_bytes([b[0], b[1]]))
+                                .as_chunks::<2>()
+                                .0
+                                .iter()
+                                .map(|b| i16::from_le_bytes(*b))
                                 .collect();
                             pending_pcm.push(samples);
                         });

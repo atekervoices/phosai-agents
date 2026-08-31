@@ -3,12 +3,14 @@
 //! # Protocol
 //!
 //! Connection: `ws://` or `wss://` to `<base_url>/v1/audio/speech/stream/ws`
+//!
 //! Sent messages (JSON):
-//!   - `{"input": "text", "voice": "pcm_female_1", "continue": true, "segment_id": "<context_id>", "temperature": 0.1}`
-//!   - Flush: `{"input": "", "voice": "pcm_female_1", "continue": false, "segment_id": "<context_id>", "temperature": 0.1}`
+//! - `{"input": "text", "voice": "pcm_female_1", "continue": true, "segment_id": "<context_id>", "temperature": 0.1}`
+//! - Flush: `{"input": "", "voice": "pcm_female_1", "continue": false, "segment_id": "<context_id>", "temperature": 0.1}`
+//!
 //! Received messages:
-//!   - Binary WS message -> raw 16 kHz PCM-16 LE audio
-//!   - JSON message `{"type": "end"}` or `{"type": "finish"}` -> completion marker (`is_final = true`)
+//! - Binary WS message -> raw 16 kHz PCM-16 LE audio
+//! - JSON message `{"type": "end"}` or `{"type": "finish"}` -> completion marker (`is_final = true`)
 
 use async_trait::async_trait;
 use serde_json::json;
