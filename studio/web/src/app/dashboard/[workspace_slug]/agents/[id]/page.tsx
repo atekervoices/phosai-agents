@@ -643,9 +643,9 @@ function AgentDetailPageContent() {
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 left-60 flex bg-background text-foreground z-30 overflow-hidden">
+    <div className="fixed inset-y-0 right-0 left-0 md:left-60 flex flex-col lg:flex-row bg-background text-foreground z-30 overflow-hidden">
       {/* ═══ LEFT PANEL — Chat ═══ */}
-      <div className="flex w-[380px] xl:w-[420px] shrink-0 flex-col min-w-0 border-r border-border bg-background">
+      <div className="flex w-full lg:w-[380px] xl:w-[420px] shrink-0 flex-col min-w-0 border-r border-border bg-background max-h-[45vh] lg:max-h-full">
         {/* Header - Command Center Style */}
         <div className="flex h-14 items-center justify-between border-b border-border/60 bg-accent/10 px-4 shrink-0 backdrop-blur-md">
           <div className="flex items-center gap-4">

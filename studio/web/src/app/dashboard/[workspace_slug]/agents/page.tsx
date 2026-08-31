@@ -78,14 +78,14 @@ function AgentsPageContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader
           icon={AiScanIcon}
           title="Agents"
           description="Create, search, and manage your voice agents."
         />
-        <div className="flex items-center gap-2">
-          <div className="relative group hidden md:block">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative group w-full sm:w-auto">
             <HugeiconsIcon
               icon={Search01Icon}
               className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors"
@@ -95,17 +95,17 @@ function AgentsPageContent() {
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-44 rounded-md bg-secondary pl-9 pr-3 text-xs focus:bg-card focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground transition-all"
+              className="h-8 w-full sm:w-44 rounded-md bg-secondary pl-9 pr-3 text-xs focus:bg-card focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground transition-all"
             />
           </div>
-          <Link href={`/dashboard/${workspace_slug}/agents/new`}>
-            <Button size="sm" className="h-8 px-4 text-xs font-medium gap-1.5">
+          <Link href={`/dashboard/${workspace_slug}/agents/new`} className="flex-1 sm:flex-initial">
+            <Button size="sm" className="h-8 w-full px-4 text-xs font-medium gap-1.5">
               <HugeiconsIcon icon={Add01Icon} className="size-3.5" /> Create agent
             </Button>
           </Link>
-          <Link href={`/dashboard/${workspace_slug}/agents/import`}>
-            <Button size="sm" variant="outline" className="h-8 px-4 text-xs font-medium gap-1.5">
-              <HugeiconsIcon icon={HardDriveUploadIcon} className="size-3.5" /> Import agent
+          <Link href={`/dashboard/${workspace_slug}/agents/import`} className="flex-1 sm:flex-initial">
+            <Button size="sm" variant="outline" className="h-8 w-full px-4 text-xs font-medium gap-1.5">
+              <HugeiconsIcon icon={HardDriveUploadIcon} className="size-3.5" /> Import
             </Button>
           </Link>
         </div>

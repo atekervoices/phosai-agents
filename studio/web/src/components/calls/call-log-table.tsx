@@ -63,38 +63,40 @@ export function CallLogTable({
   }, []);
 
   return (
-    <div className="flat-card overflow-hidden">
-      {showColumnHeader ? (
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,220px)_96px_80px_20px] gap-4 px-5 py-3 text-xs text-muted-foreground border-b border-border/30">
-          <span className="pl-11">Agent</span>
-          <span>Time / Duration</span>
-          <span className="w-24 text-center">Recording</span>
-          <span className="w-20 text-right">Status</span>
-          <span aria-hidden="true" />
-        </div>
-      ) : null}
+    <div className="flat-card overflow-hidden w-full">
+      <div className="overflow-x-auto w-full no-scrollbar">
+        <div className="min-w-[620px]">
+          {showColumnHeader ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,220px)_96px_80px_20px] gap-4 px-5 py-3 text-xs text-muted-foreground border-b border-border/30">
+              <span className="pl-11">Agent</span>
+              <span>Time / Duration</span>
+              <span className="w-24 text-center">Recording</span>
+              <span className="w-20 text-right">Status</span>
+              <span aria-hidden="true" />
+            </div>
+          ) : null}
 
-      {loading ? (
-        <div className="space-y-px">
-          {Array.from({ length: loadingRows }).map((_, i) => (
-            <div key={i} className="h-16 bg-secondary/30 animate-pulse" />
-          ))}
-        </div>
-      ) : calls.length === 0 ? (
-        <div className="py-20 text-center">
-          <div className="size-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-5">
-            <HugeiconsIcon icon={CallDisabled02Icon} className="size-7 text-muted-foreground/40" />
-          </div>
-          <h3 className="text-sm font-semibold text-foreground mb-1.5">{emptyTitle}</h3>
-          <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">{emptyDescription}</p>
-        </div>
-      ) : (
-        <div>
-          {calls.map((call, idx) => (
-            <div
-              key={call.id}
-              className={`group grid grid-cols-[minmax(0,1fr)_minmax(0,220px)_96px_80px_20px] gap-4 items-center px-5 py-3.5 hover:bg-secondary/40 transition-colors ${idx > 0 ? "border-t border-border/30" : ""}`}
-            >
+          {loading ? (
+            <div className="space-y-px">
+              {Array.from({ length: loadingRows }).map((_, i) => (
+                <div key={i} className="h-16 bg-secondary/30 animate-pulse" />
+              ))}
+            </div>
+          ) : calls.length === 0 ? (
+            <div className="py-20 text-center">
+              <div className="size-16 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-5">
+                <HugeiconsIcon icon={CallDisabled02Icon} className="size-7 text-muted-foreground/40" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground mb-1.5">{emptyTitle}</h3>
+              <p className="text-sm text-muted-foreground max-w-[280px] mx-auto">{emptyDescription}</p>
+            </div>
+          ) : (
+            <div>
+              {calls.map((call, idx) => (
+                <div
+                  key={call.id}
+                  className={`group grid grid-cols-[minmax(0,1fr)_minmax(0,220px)_96px_80px_20px] gap-4 items-center px-5 py-3.5 hover:bg-secondary/40 transition-colors ${idx > 0 ? "border-t border-border/30" : ""}`}
+                >
               <Link
                 href={`/dashboard/${workspace_slug}/calls/${call.id}`}
                 className="block min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
@@ -222,6 +224,8 @@ export function CallLogTable({
           ))}
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

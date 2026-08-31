@@ -43,8 +43,8 @@ export default function PreviewPanel({
   return (
     <div className="relative flex flex-1 flex-col bg-background/50 min-w-0 overflow-hidden">
       {/* Premium Tab bar */}
-      <div className="flex h-14 items-center justify-between gap-4 border-b border-border/60 bg-accent/20 px-4 shrink-0 shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-background/40 border border-border/40 backdrop-blur-sm">
+      <div className="flex h-14 items-center justify-between gap-2 sm:gap-4 border-b border-border/60 bg-accent/20 px-2 sm:px-4 shrink-0 overflow-x-auto no-scrollbar shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-xl bg-background/40 border border-border/40 backdrop-blur-sm shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.key}

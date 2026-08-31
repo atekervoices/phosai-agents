@@ -13,7 +13,7 @@ export function PageHeader({ icon, title, description, action, className }: Page
   const hasDescription = Boolean(description);
 
   return (
-    <div className={cn("flex items-center justify-between gap-4", className)}>
+    <div className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full", className)}>
       <div className="flex items-center gap-3.5 min-w-0">
         {icon ? (
           <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
@@ -24,7 +24,7 @@ export function PageHeader({ icon, title, description, action, className }: Page
           <h1
             className={cn(
               "font-bold tracking-tight text-foreground",
-              hasDescription ? "text-lg" : "text-xl"
+              hasDescription ? "text-lg sm:text-xl" : "text-xl sm:text-2xl"
             )}
           >
             {title}
@@ -34,7 +34,7 @@ export function PageHeader({ icon, title, description, action, className }: Page
           ) : null}
         </div>
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? <div className="flex items-center flex-wrap gap-2 shrink-0">{action}</div> : null}
     </div>
   );
 }
