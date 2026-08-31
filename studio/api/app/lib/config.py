@@ -236,7 +236,7 @@ class Settings(BaseSettings):
     gemini: GeminiConfig = Field(default_factory=GeminiConfig)
     experimental: ExperimentalConfig = Field(default_factory=ExperimentalConfig)
     # OAuth callback URL — per-deployment, not per-integration
-    oauth_callback_base_url: str = "http://localhost:3000"
+    oauth_callback_base_url: str = "https://agents.phosaico.com"
 
     # CORS
     allowed_origins: list[str] = Field(
@@ -244,6 +244,10 @@ class Settings(BaseSettings):
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://studio-web:3000",
+            "https://agents.phosaico.com",
+            "https://studio.phosaico.com",
+            "https://api.phosaico.com",
+            "https://voice.phosaico.com",
         ]
     )
 

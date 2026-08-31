@@ -1,10 +1,6 @@
 name: Continuous Deployment (CD)
 
 on:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
     inputs:
       environment:

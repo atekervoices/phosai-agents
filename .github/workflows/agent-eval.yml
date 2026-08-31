@@ -1,14 +1,6 @@
 name: Agent Evaluation & Tool Verification
 
 on:
-  pull_request:
-    paths:
-      - 'proto/**'
-      - 'studio/api/app/schemas/**'
-      - 'studio/api/app/tools/**'
-      - 'studio/api/app/agents/**'
-      - 'studio/api/tests/**'
-      - 'voice/engine/**'
   workflow_dispatch:
 
 jobs:
