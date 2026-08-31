@@ -401,7 +401,7 @@ async def text_test_socket(
                 status="completed",
                 direction="webrtc",
                 duration_seconds=max(5, int(perf_counter() - session_t0)),
-                created_at=datetime.datetime.now(datetime.timezone.utc),
+                created_at=datetime.datetime.now(datetime.UTC),
             )
             db.add(call_log)
             await db.commit()

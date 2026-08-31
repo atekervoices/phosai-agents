@@ -116,15 +116,15 @@ async def get_admin_users(
                         for em in emails:
                             if em.get("id") == primary_email_id or not email_str:
                                 email_str = em.get("email_address", "")
-                        
+
                         public_meta = u.get("public_metadata", {}) or {}
                         role_meta = str(public_meta.get("role", "")).lower()
                         is_admin = role_meta == "admin" or (email_str and email_str.lower() == admin_email)
-                        
+
                         agents_cnt = agent_counts_map.get(u_id, 0)
                         created_ts = u.get("created_at")
                         created_str = (
-                            datetime.datetime.fromtimestamp(created_ts / 1000, tz=datetime.timezone.utc).isoformat()
+                            datetime.datetime.fromtimestamp(created_ts / 1000, tz=datetime.UTC).isoformat()
                             if created_ts else "2026-01-01T00:00:00Z"
                         )
 
@@ -281,7 +281,7 @@ async def get_admin_analytics(
 ) -> dict[str, Any]:
     """Get dynamic database-backed analytics for call volume, latency, and provider distribution."""
     days = 30 if timeframe == "30d" else (90 if timeframe == "90d" else 7)
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
 
     # 1. Call Volume Trend grouped by date from actual DB records
     days_data = []

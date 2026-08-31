@@ -1588,7 +1588,7 @@ async def get_tts_voices(
         )
 
     if provider in ("phosai", "phosai-ws"):
-        PHOSAI_VOICE_SPECS = [
+        phosai_voice_specs = [
             # English
             ("eng_female_1", "English Female 1", "en", "female"),
             ("eng_male_1", "English Male 1", "en", "male"),
@@ -1709,7 +1709,7 @@ async def get_tts_voices(
         ]
         voices = [
             VoiceOption(voice_id=vid, name=vname, language=vlang, gender=vgen)
-            for vid, vname, vlang, vgen in PHOSAI_VOICE_SPECS
+            for vid, vname, vlang, vgen in phosai_voice_specs
         ]
         if language:
             lang_prefix = language.split("-")[0].lower()
