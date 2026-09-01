@@ -12,6 +12,14 @@ const inter = Inter({ subsets: ["latin"], preload: false });
 export const metadata: Metadata = {
   title: APP_TITLE,
   description: APP_SITE_DESCRIPTION,
+  icons: {
+    icon: [
+      { url: "/phosai_logo.png", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/phosai_logo.png",
+    apple: "/phosai_logo.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
