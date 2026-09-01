@@ -32,6 +32,9 @@ function DashboardPageContent() {
   const workspace_slug = (params?.workspace_slug as string) || "default";
   const [agents, setAgents] = useState<Agent[]>([]);
   const [recentCalls, setRecentCalls] = useState<CallLog[]>([]);
+  const [totalDbCalls, setTotalDbCalls] = useState<number>(0);
+  const [completedDbCalls, setCompletedDbCalls] = useState<number>(0);
+  const [trendData, setTrendData] = useState<Array<{ day: string; calls: number }>>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
   const [callsLoading, setCallsLoading] = useState(true);
   const [engineLatencyMs, setEngineLatencyMs] = useState<number | null>(null);
@@ -67,7 +70,7 @@ function DashboardPageContent() {
 
     setAgentsLoading(true);
     api.agents
-      .list(0, 10)
+      .list(0, 50)
       .then((data) => {
         if (cancelled) return;
         setAgents(data.agents);
@@ -83,18 +86,37 @@ function DashboardPageContent() {
       .then((data) => {
         if (cancelled) return;
         setRecentCalls(data.calls);
+        if (typeof data.total === "number") {
+          setTotalDbCalls((prev) => Math.max(prev, data.total));
+        }
       })
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setCallsLoading(false);
       });
 
-    fetch("/api-proxy/admin/overview")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        if (typeof data.voice_engine_latency_ms === "number") {
-          setEngineLatencyMs(Math.round(data.voice_engine_latency_ms));
+    // Fetch full system KPIs & 7-day database trend
+    Promise.all([
+      fetch("/api-proxy/admin/overview").then((res) => (res.ok ? res.json() : null)),
+      fetch("/api-proxy/admin/analytics?timeframe=7d").then((res) => (res.ok ? res.json() : null)),
+    ])
+      .then(([overview, analytics]) => {
+        if (cancelled) return;
+        if (overview) {
+          if (typeof overview.total_calls === "number") setTotalDbCalls(overview.total_calls);
+          if (typeof overview.completed_calls === "number") setCompletedDbCalls(overview.completed_calls);
+          if (typeof overview.voice_engine_latency_ms === "number") {
+            setEngineLatencyMs(Math.round(overview.voice_engine_latency_ms));
+          }
+        }
+        if (analytics?.call_volume_trend && Array.isArray(analytics.call_volume_trend)) {
+          const trend = analytics.call_volume_trend.map(
+            (pt: { date: string; total: number }) => ({
+              day: pt.date,
+              calls: pt.total,
+            })
+          );
+          setTrendData(trend);
         }
       })
       .catch(() => {});
@@ -105,28 +127,33 @@ function DashboardPageContent() {
   }, []);
 
   // Compute live call metrics
-  const totalCalls = recentCalls.length;
-  const completedCalls = recentCalls.filter((c) => c.status === "completed").length;
+  const totalCalls = totalDbCalls || recentCalls.length;
+  const completedCalls = completedDbCalls || recentCalls.filter((c) => c.status === "completed").length;
   const successRate = totalCalls > 0 ? ((completedCalls / totalCalls) * 100).toFixed(1) : "100.0";
-  const totalCallSeconds = recentCalls.reduce((acc, c) => acc + (c.duration_seconds || 0), 0);
-  const totalCallMinutes = (totalCallSeconds / 60).toFixed(1);
+  const recentSeconds = recentCalls.reduce((acc, c) => acc + (c.duration_seconds || 0), 0);
+  const avgSec = recentCalls.length > 0 ? recentSeconds / recentCalls.length : 144;
+  const totalCallMinutes = ((totalCalls * avgSec) / 60).toFixed(1);
 
-  // Group calls by last 7 calendar dates for plot
-  const plotData = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const count = recentCalls.filter((c) => {
-      if (!c.created_at) return false;
-      const callDate = new Date(c.created_at);
-      return (
-        callDate.getFullYear() === d.getFullYear() &&
-        callDate.getMonth() === d.getMonth() &&
-        callDate.getDate() === d.getDate()
-      );
-    }).length;
-    return { day: label, calls: count, mins: Math.round(count * 1.8) };
-  });
+  // Group calls by last 7 calendar dates for plot (using DB trendData if available)
+  const plotData =
+    trendData.length === 7
+      ? trendData
+      : Array.from({ length: 7 }).map((_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+          const count = recentCalls.filter((c) => {
+            if (!c.created_at) return false;
+            const callDate = new Date(c.created_at);
+            return (
+              callDate.getFullYear() === d.getFullYear() &&
+              callDate.getMonth() === d.getMonth() &&
+              callDate.getDate() === d.getDate()
+            );
+          }).length;
+          return { day: label, calls: count };
+        });
+
   const [hoveredPoint, setHoveredPoint] = useState<{ day: string; calls: number } | null>(null);
 
   const rawMax = Math.max(...plotData.map((pt) => pt.calls), 0);
