@@ -40,35 +40,36 @@ export function CallHeader({
 
   return (
     <section className="flat-card p-5 space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-semibold text-foreground">Call Detail</h2>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>
-              Call ID: <span className="font-mono">{call.id}</span>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="shrink-0 font-medium">Call ID:</span>
+            <span className="font-mono text-foreground/90 bg-muted/60 px-1.5 py-0.5 rounded text-[11px] select-all break-all">
+              {call.id}
             </span>
             <button
               type="button"
               onClick={handleCopyId}
-              className="inline-flex h-5 w-5 items-center justify-center rounded border border-border/50 bg-secondary/40 text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex h-5 w-5 items-center justify-center rounded border border-border/50 bg-secondary/40 text-muted-foreground transition-colors hover:text-foreground shrink-0"
               title={copied ? "Copied" : "Copy call ID"}
               aria-label={copied ? "Copied" : "Copy call ID"}
             >
               {copied ? (
-                <HugeiconsIcon icon={Tick01Icon} className="size-3" />
+                <HugeiconsIcon icon={Tick01Icon} className="size-3 text-emerald-500" />
               ) : (
                 <HugeiconsIcon icon={Copy01Icon} className="size-3" />
               )}
             </button>
-          </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2 shrink-0">
           {langfuseLink && (
             <a
               href={langfuseLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center hover:text-primary gap-1.5 rounded-md bg-secondary px-3 py-2 text-xs text-foreground transition-colors hover:bg-primary/10"
+              className="inline-flex items-center hover:text-primary gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-primary/10"
               title="Open Trace in Langfuse"
             >
               <HugeiconsIcon icon={InformationCircleIcon} className="size-3.5" />
@@ -77,14 +78,14 @@ export function CallHeader({
           )}
           <Link
             href={`/dashboard/${workspace_slug}/agents/${call.agent_id}`}
-            className="inline-flex max-w-60 items-center hover:text-primary gap-2 rounded-md bg-secondary px-3 py-2 text-xs text-foreground transition-colors hover:bg-primary/10"
+            className="inline-flex max-w-[200px] items-center hover:text-primary gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-primary/10"
             title={call.agent_name ?? "Unknown Agent"}
           >
-            <HugeiconsIcon icon={Robot01Icon} className="size-3.5" />
+            <HugeiconsIcon icon={Robot01Icon} className="size-3.5 shrink-0" />
             <span className="truncate">{call.agent_name ?? "Unknown Agent"}</span>
           </Link>
-          <span className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-xs text-foreground capitalize">
-            <HugeiconsIcon icon={InformationCircleIcon} className="size-3.5" />
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs text-foreground capitalize">
+            <HugeiconsIcon icon={InformationCircleIcon} className="size-3.5 shrink-0" />
             {call.status}
           </span>
         </div>
