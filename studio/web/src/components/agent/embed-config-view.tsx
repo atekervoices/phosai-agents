@@ -46,14 +46,15 @@ export default function EmbedConfigView({ agentId, agentName = "Voice Agent" }: 
   const [position, setPosition] = useState<EmbedPosition>("bottom-right");
   const [title, setTitle] = useState(agentName);
   const [autoOpen, setAutoOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chat" | "voice">("chat");
-  const [origin, setOrigin] = useState<string>("https://app.phosai.com");
-
-  const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
+  const [origin, setOrigin] = useState<string>("");
 
   useEffect(() => {
-    setOrigin(window.location.origin);
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
   }, []);
+
+  const [copiedFormat, setCopiedFormat] = useState<string | null>(null);
 
   const encodedColor = encodeURIComponent(brandColor);
 

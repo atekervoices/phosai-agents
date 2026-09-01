@@ -151,7 +151,7 @@ export function VoiceModal({
                   <FormattedMarkdown content={latestAiTurn.text} />
                 ) : (
                   <p className="text-muted-foreground/80">
-                    Hello! Welcome to PhosAI, your destination for innovative AI and Data solutions. How may I assist you with our products today?
+                    Click Connect to start speaking with {title}.
                   </p>
                 )}
               </div>
