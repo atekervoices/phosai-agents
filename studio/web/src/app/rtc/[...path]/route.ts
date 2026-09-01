@@ -23,8 +23,17 @@ export async function GET(
       headers: request.headers,
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+      return NextResponse.json(data, { status: res.status });
+    } catch {
+      return new NextResponse(text, {
+        status: res.status,
+        headers: { "Content-Type": res.headers.get("Content-Type") || "text/plain" },
+      });
+    }
   } catch (error) {
     console.error("[RTC Proxy] GET failed:", error);
     return NextResponse.json({ error: "RTC server unavailable" }, { status: 502 });
@@ -54,8 +63,17 @@ export async function POST(
       body: body || undefined,
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+      return NextResponse.json(data, { status: res.status });
+    } catch {
+      return new NextResponse(text, {
+        status: res.status,
+        headers: { "Content-Type": res.headers.get("Content-Type") || "text/plain" },
+      });
+    }
   } catch (error) {
     console.error("[RTC Proxy] POST failed:", error);
     return NextResponse.json({ error: "RTC server unavailable" }, { status: 502 });

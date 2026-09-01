@@ -627,7 +627,7 @@ export default function ManualTestView({
       const rtcRes = await fetch(`${rtcBase}/rtc/offer/${session_id}?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sdp: offer.sdp, type: offer.type }),
+        body: JSON.stringify({ offer: { sdp: offer.sdp, type: offer.type } }),
       });
 
       const rtcData = await rtcRes.json();
