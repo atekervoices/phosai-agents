@@ -6,8 +6,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import func as sa_func
-from sqlalchemy import select
+from sqlalchemy import func as sa_func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.recordings import resolve_recording_http_url
@@ -41,14 +40,18 @@ async def list_calls(
     query = select(Call, Agent.name).outerjoin(Agent, Agent.id == Call.agent_id)
     count_query = select(sa_func.count(Call.id)).outerjoin(Agent, Agent.id == Call.agent_id)
 
-    if ctx and ctx.role == "admin":
+    if ctx and ctx.role == "admin" and not ctx.user_id:
         pass
     elif ctx and ctx.organization_id:
         query = query.where(Call.organization_id == ctx.organization_id)
         count_query = count_query.where(Call.organization_id == ctx.organization_id)
     elif ctx and ctx.user_id:
         user_agents_stmt = select(Agent.id).where(Agent.user_id == ctx.user_id)
-        user_filter = (Call.user_id == ctx.user_id) | (Call.user_id.is_(None)) | (Call.agent_id.in_(user_agents_stmt))
+        user_filter = or_(Call.user_id == ctx.user_id, Call.agent_id.in_(user_agents_stmt))
+        query = query.where(user_filter)
+        count_query = count_query.where(user_filter)
+    else:
+        user_filter = Call.user_id.is_(None)
         query = query.where(user_filter)
         count_query = count_query.where(user_filter)
 

@@ -99,9 +99,9 @@ async def require_tenant(
     """
     user_id = request.headers.get("X-User-Id")
     org_id = request.headers.get("X-Organization-Id")
-    role_header = request.headers.get("X-Role", "").lower()
+    role_header = request.headers.get("X-Role", "").strip().lower()
 
-    is_admin = role_header == "admin" or bool(org_id) or (user_id and "admin" in user_id.lower())
+    is_admin = role_header == "admin"
 
     return TenantContext(
         user_id=user_id,

@@ -40,10 +40,24 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
       userId = authObj.userId ?? null;
       orgId = authObj.orgId ?? null;
       const sessionClaims = authObj.sessionClaims;
-      const publicRole = String((sessionClaims as any)?.metadata?.role || (sessionClaims as any)?.publicMetadata?.role || "").toLowerCase();
-      const userEmail = String((sessionClaims as any)?.email || (sessionClaims as any)?.email_address || "");
-      const adminEmail = process.env.ADMIN_EMAIL || "simonallanachuka@gmail.com";
-      isAdmin = publicRole === "admin" || Boolean(orgId) || (Boolean(userEmail) && userEmail.toLowerCase() === adminEmail.toLowerCase());
+      const publicRole = String(
+        (sessionClaims as any)?.metadata?.role ||
+          (sessionClaims as any)?.publicMetadata?.role ||
+          ""
+      ).toLowerCase();
+      const userEmail = String(
+        (sessionClaims as any)?.email ||
+          (sessionClaims as any)?.email_address ||
+          ""
+      );
+      const adminEmail = (
+        process.env.ADMIN_EMAIL ||
+        process.env.NEXT_PUBLIC_ADMIN_EMAIL ||
+        "simonallanachuka@gmail.com"
+      ).toLowerCase();
+      isAdmin =
+        publicRole === "admin" ||
+        (Boolean(userEmail) && userEmail.toLowerCase() === adminEmail);
     } catch {
       /* fallback */
     }
@@ -60,11 +74,13 @@ const clerkHandler = clerkMiddleware(async (auth, req) => {
 
     const requestHeaders = new Headers(req.headers);
     if (apiKey) requestHeaders.set("X-API-Key", apiKey);
-    const superAdminKey = process.env.STUDIO_SUPERADMIN_API_KEY || apiKey;
-    if (superAdminKey) requestHeaders.set("X-SuperAdmin-Key", superAdminKey);
+    if (isAdmin) {
+      const superAdminKey = process.env.STUDIO_SUPERADMIN_API_KEY || apiKey;
+      if (superAdminKey) requestHeaders.set("X-SuperAdmin-Key", superAdminKey);
+      requestHeaders.set("X-Role", "admin");
+    }
     if (userId) requestHeaders.set("X-User-Id", userId);
     if (orgId) requestHeaders.set("X-Organization-Id", orgId);
-    if (isAdmin) requestHeaders.set("X-Role", "admin");
 
     return NextResponse.rewrite(targetUrl, {
       request: { headers: requestHeaders },
