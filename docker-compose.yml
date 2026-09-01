@@ -141,8 +141,26 @@ services:
       - studio-api
     command: sh -c "pnpm install && pnpm dev -H 0.0.0.0"
 
+  # Caddy automated reverse proxy
+  caddy:
+    image: caddy:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - studio-web
+      - studio-api
+      - voice-server
+
 volumes:
   pgdata:
   recordings:
   studio_web_next:
   studio_web_pnpm_store:
+  caddy_data:
+  caddy_config:
