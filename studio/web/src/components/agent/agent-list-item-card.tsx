@@ -64,12 +64,18 @@ function VersionBadge({
   const isAccent = tone === "accent";
   return (
     <span
-      className={`inline-flex h-6 items-center overflow-hidden rounded-md border text-[10px] font-semibold uppercase tracking-wide ${
-        isAccent ? "border-primary/50 text-primary" : "border-border text-foreground"
+      className={`inline-flex h-5.5 items-center overflow-hidden rounded-md border text-[10px] font-semibold tracking-wide shrink-0 ${
+        isAccent
+          ? "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          : "border-border bg-secondary/50 text-muted-foreground"
       }`}
     >
-      <span className="px-2">{label}</span>
-      <span className={`border-l px-2 ${isAccent ? "border-primary/50" : "border-border"}`}>
+      <span className="px-2 uppercase font-bold">{label}</span>
+      <span
+        className={`border-l px-1.5 font-mono ${
+          isAccent ? "border-amber-500/30" : "border-border"
+        }`}
+      >
         v{version}
       </span>
     </span>
@@ -90,57 +96,57 @@ export default function AgentListItemCard({ agent, href, className }: AgentListI
   const timezone = getTimezoneFromConfig(agent.current_config);
   const language = rawLanguage ? formatLanguageLabel(rawLanguage) : null;
 
-  const hasExtraDetails = Boolean(description || language || timezone);
-
   return (
-    <Link href={targetHref} className="block">
+    <Link href={targetHref} className="block group">
       <div
-        className={`group flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3 hover:bg-secondary/50 transition-colors ${
+        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-xl border border-border/70 bg-card p-4 hover:border-primary/40 hover:bg-secondary/30 transition-all shadow-xs ${
           className ?? ""
         }`}
       >
-        <div className={`min-w-0 flex gap-3 ${hasExtraDetails ? "items-start" : "items-center"}`}>
-          <div className="size-9 shrink-0 rounded-lg bg-secondary text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors flex items-center justify-center">
-            <HugeiconsIcon icon={Robot01Icon} className="size-4" />
+        <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+          <div className="size-10 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+            <HugeiconsIcon icon={Robot01Icon} className="size-5" />
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-foreground">{agent.name}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate max-w-[260px] sm:max-w-[320px]">
+                {agent.name}
+              </h3>
+            </div>
             {description ? (
               <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{description}</p>
             ) : null}
-            {language || timezone ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {(language || timezone) && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                 {language ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <HugeiconsIcon icon={LanguageCircleIcon} className="size-3.5" />
-                    {language}
+                  <span className="inline-flex items-center gap-1">
+                    <HugeiconsIcon icon={LanguageCircleIcon} className="size-3.5 text-muted-foreground/70" />
+                    <span>{language}</span>
                   </span>
                 ) : null}
                 {timezone ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <HugeiconsIcon icon={TimeZoneIcon} className="size-3.5" />
-                    {timezone}
+                  <span className="inline-flex items-center gap-1">
+                    <HugeiconsIcon icon={TimeZoneIcon} className="size-3.5 text-muted-foreground/70" />
+                    <span>{timezone}</span>
                   </span>
                 ) : null}
               </div>
-            ) : null}
+            )}
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
-          {showCurrent || showActive ? (
-            <div className="flex items-center gap-1.5">
-              {showCurrent && currentVersion !== null ? (
-                <VersionBadge label="current" version={currentVersion} tone="neutral" />
-              ) : null}
-              {showActive && activeVersion !== null ? (
-                <VersionBadge label="active" version={activeVersion} tone="accent" />
-              ) : null}
-            </div>
-          ) : null}
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 pt-2 sm:pt-0 border-t border-border/40 sm:border-t-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {showCurrent && currentVersion !== null ? (
+              <VersionBadge label="current" version={currentVersion} tone="neutral" />
+            ) : null}
+            {showActive && activeVersion !== null ? (
+              <VersionBadge label="active" version={activeVersion} tone="accent" />
+            ) : null}
+          </div>
           <HugeiconsIcon
             icon={ArrowRight01Icon}
-            className="size-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors"
+            className="size-4 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all"
           />
         </div>
       </div>

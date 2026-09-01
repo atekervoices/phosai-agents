@@ -366,9 +366,9 @@ function DashboardPageContent() {
         </div>
 
         {agentsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
             {[1, 2].map((i) => (
-              <div key={i} className="h-44 rounded-xl bg-secondary animate-pulse" />
+              <div key={i} className="h-28 rounded-xl bg-secondary animate-pulse" />
             ))}
           </div>
         ) : agents.length === 0 ? (
@@ -385,7 +385,7 @@ function DashboardPageContent() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
             {agents.map((agent) => (
               <AgentListItemCard
                 key={agent.id}
