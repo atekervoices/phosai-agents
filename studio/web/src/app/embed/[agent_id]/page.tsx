@@ -104,13 +104,16 @@ export default function PublicEmbedPage({ params }: PageProps) {
           });
         } else if (data.type === "transcript") {
           const role = (data.role as "user" | "assistant") || "assistant";
-          const text = (data.text as string) || "";
+          let rawText = (data.text as string) || "";
+          if (role === "assistant") {
+            rawText = rawText.replace(/^[○◐✓]\s*/, "");
+          }
           setMessages((prev) => {
             const last = prev[prev.length - 1];
-            if (last && last.role === role && role === "assistant") {
-              return [...prev.slice(0, -1), { ...last, text }];
+            if (last && last.role === role) {
+              return [...prev.slice(0, -1), { ...last, text: rawText }];
             }
-            return [...prev, { id: `ai-${Date.now()}`, role, text }];
+            return [...prev, { id: `${role}-${Date.now()}`, role, text: rawText }];
           });
           setIsChatLoading(false);
         } else if (data.type === "processing") {
@@ -156,7 +159,8 @@ export default function PublicEmbedPage({ params }: PageProps) {
 
         if (!response.ok) throw new Error("API stream error");
         const data = await response.json();
-        const replyText = data.text || data.response || "I have received your message.";
+        let replyText = data.text || data.response || "I have received your message.";
+        replyText = replyText.replace(/^[○◐✓]\s*/, "");
 
         setMessages((prev) => [
           ...prev,
@@ -220,17 +224,23 @@ export default function PublicEmbedPage({ params }: PageProps) {
         setVoiceState(msg.state);
       } else if (msg.type === "transcript") {
         const role = (msg.role as "user" | "assistant") || "assistant";
-        const text = (msg.text as string) || "";
+        let text = (msg.text as string) || "";
+        if (role === "assistant") {
+          text = text.replace(/^[○◐✓]\s*/, "");
+        }
         setVoiceTimeline((prev) => {
           const last = prev[prev.length - 1];
-          if (last && last.role === role && role === "assistant") {
+          if (last && last.role === role) {
             return [...prev.slice(0, -1), { ...last, text }];
           }
           return [...prev, { id: `voice-t-${Date.now()}`, role, text }];
         });
       } else if (msg.type === "transcript_chunk") {
         const role = (msg.role as "user" | "assistant") || "assistant";
-        const text = (msg.text as string) || "";
+        let text = (msg.text as string) || "";
+        if (role === "assistant") {
+          text = text.replace(/^[○◐✓]\s*/, "");
+        }
         setVoiceTimeline((prev) => {
           const last = prev[prev.length - 1];
           if (last && last.role === role) {
