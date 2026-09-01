@@ -97,7 +97,7 @@ export default function AdminOverviewPage() {
       {/* Primary KPI Cards Grid — Unified Golden Yellow Icons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Active Streams */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Active Streams</span>
             <div className="p-2 rounded-md bg-primary/10 text-primary">
@@ -114,7 +114,7 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Total Calls */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Total Calls Handled</span>
             <div className="p-2 rounded-md bg-primary/10 text-primary">
@@ -131,7 +131,7 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Total Agents */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Provisioned Agents</span>
             <div className="p-2 rounded-md bg-primary/10 text-primary">
@@ -145,7 +145,7 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Telephony Phone Numbers */}
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">Telephony Phone Numbers</span>
             <div className="p-2 rounded-md bg-primary/10 text-primary">
@@ -160,7 +160,7 @@ export default function AdminOverviewPage() {
       </div>
 
       {/* Sleek Golden Thin Line Graph Card */}
-      <div className="rounded-xl bg-card border border-border p-6 space-y-6 shadow-sm">
+      <div className="rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-foreground">Platform 7-Day Call Volume Graph</h3>
@@ -196,7 +196,7 @@ export default function AdminOverviewPage() {
 
               {totalCallsCount === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <div className="px-4 py-2 rounded-lg bg-card/95 border border-border text-xs font-mono text-muted-foreground shadow-sm">
+                  <div className="px-4 py-2 rounded-lg bg-card/95 border border-border text-xs font-mono text-muted-foreground">
                     No call traffic recorded for this timeframe. Test calls will plot here live.
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export default function AdminOverviewPage() {
                     >
                       {/* Tooltip */}
                       {isHovered && (
-                        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-lg bg-popover text-popover-foreground border border-border shadow-xl text-xs whitespace-nowrap space-y-0.5 pointer-events-none">
+                        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-lg bg-popover text-popover-foreground border border-border text-xs whitespace-nowrap space-y-0.5 pointer-events-none">
                           <div className="font-semibold text-primary">{pt.date}: {pt.total} Calls</div>
                         </div>
                       )}
@@ -271,7 +271,7 @@ export default function AdminOverviewPage() {
       {/* Services Matrix & System Info */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Core Services */}
-        <div className="lg:col-span-2 rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+        <div className="lg:col-span-2 rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Infrastructure Status</h2>
@@ -330,7 +330,7 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Specifications */}
-        <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-4">
           <div className="border-b border-border pb-3">
             <h2 className="text-sm font-semibold text-foreground">System Specifications</h2>
             <p className="text-xs text-muted-foreground">Runtime health & architecture</p>

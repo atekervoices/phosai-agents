@@ -50,7 +50,7 @@ export default function AdminTelephonyPage() {
         />
       </div>
 
-      <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+      <div className="rounded-xl bg-card border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-foreground">Provisioned Phone Numbers</h3>
           <span className="text-xs font-mono text-muted-foreground">{numbers.length} Numbers Active</span>
@@ -75,7 +75,7 @@ export default function AdminTelephonyPage() {
             {numbers.map((num) => (
               <div
                 key={num.id}
-                className="rounded-xl bg-card border border-border p-5 space-y-3 shadow-sm hover:border-primary/50 transition-all"
+                className="rounded-xl bg-card border border-border p-5 space-y-3 hover:border-primary/50 transition-all"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

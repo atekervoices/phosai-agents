@@ -47,7 +47,7 @@ export default function AdminProvidersPage() {
         description="Encrypted API keys and provider connections for Telnyx, Deepgram, OpenAI, ElevenLabs, and Cartesia."
       />
 
-      <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+      <div className="rounded-xl bg-card border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-foreground">Encrypted Provider Credentials</h3>
           <span className="text-xs font-mono text-muted-foreground">{credentials.length} Tokens Vaulted</span>
@@ -72,7 +72,7 @@ export default function AdminProvidersPage() {
             {credentials.map((cred) => (
               <div
                 key={cred.id}
-                className="rounded-xl bg-card border border-border p-5 flex items-center justify-between shadow-sm"
+                className="rounded-xl bg-card border border-border p-5 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
                   <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">

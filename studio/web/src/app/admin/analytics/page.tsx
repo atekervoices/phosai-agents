@@ -118,14 +118,14 @@ export default function AdminAnalyticsPage() {
         />
 
         {/* Timeframe Selector */}
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-card border border-border shadow-sm">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-card border border-border">
           {(["7d", "30d", "90d"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTimeframe(t)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                 timeframe === t
-                  ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                  ? "bg-primary text-primary-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -137,7 +137,7 @@ export default function AdminAnalyticsPage() {
 
       {/* Top High-Level Analytics Cards — 3 Columns */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Total Call Volume</span>
             <HugeiconsIcon icon={VoiceIcon} className="size-4 text-primary" />
@@ -148,7 +148,7 @@ export default function AdminAnalyticsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Est. Call Talk Time</span>
             <HugeiconsIcon icon={Clock01Icon} className="size-4 text-primary" />
@@ -159,7 +159,7 @@ export default function AdminAnalyticsPage() {
           <div className="text-[11px] text-primary font-medium">Avg 2m 24s per call</div>
         </div>
 
-        <div className="rounded-xl bg-card border border-border p-5 space-y-2 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 hover:ring-primary/20 p-5 space-y-2 transition-all">
           <div className="flex items-center justify-between text-muted-foreground text-xs font-medium">
             <span>Peak Channel Concurrency</span>
             <HugeiconsIcon icon={ActivityIcon} className="size-4 text-primary" />
@@ -175,7 +175,7 @@ export default function AdminAnalyticsPage() {
       </div>
 
       {/* Main Full-Width Call Volume Trend Line Graph */}
-      <div className="w-full rounded-xl bg-card border border-border p-6 space-y-6 shadow-sm">
+      <div className="w-full rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-foreground">Call Volume & Outcome Breakdown</h3>
@@ -219,7 +219,7 @@ export default function AdminAnalyticsPage() {
 
               {totalCalls === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <div className="px-4 py-2 rounded-lg bg-card/95 border border-border text-xs font-mono text-muted-foreground shadow-sm">
+                  <div className="px-4 py-2 rounded-lg bg-card/95 border border-border text-xs font-mono text-muted-foreground">
                     No call traffic recorded for this timeframe. Test calls will plot here live.
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export default function AdminAnalyticsPage() {
                     >
                       {/* Tooltip */}
                       {isHovered && (
-                        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-lg bg-popover text-popover-foreground border border-border shadow-xl text-xs whitespace-nowrap space-y-0.5 pointer-events-none">
+                        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 px-3 py-1.5 rounded-lg bg-popover text-popover-foreground border border-border text-xs whitespace-nowrap space-y-0.5 pointer-events-none">
                           <div className="font-semibold text-primary">{pt.date}: {pt.total} Calls</div>
                           <div className="text-[10px] text-muted-foreground font-mono">
                             <span className="text-emerald-400">{pt.completed} Completed</span> | <span className="text-rose-400">{pt.failed} Failed</span>
@@ -305,7 +305,7 @@ export default function AdminAnalyticsPage() {
       {/* Bottom Grid: Call Disconnect Reasons & Top Agent Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Call Termination & Disconnect Reasons */}
-        <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-4">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-base font-semibold text-foreground">Call Termination & Disconnect Reasons</h3>
@@ -333,7 +333,7 @@ export default function AdminAnalyticsPage() {
         </div>
 
         {/* Top Voice Agents Leaderboard */}
-        <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+        <div className="rounded-xl bg-card ring-1 ring-foreground/10 p-6 space-y-4">
           <div className="flex justify-between items-center">
             <div>
               <h3 className="text-base font-semibold text-foreground">Top Agent Utilization Leaderboard</h3>

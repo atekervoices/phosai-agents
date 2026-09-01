@@ -61,7 +61,7 @@ export default function AdminAgentsPage() {
         />
         <Link
           href="/dashboard/default/agents/new"
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           <HugeiconsIcon icon={Add01Icon} className="size-4" />
           Create New Agent
@@ -103,7 +103,7 @@ export default function AdminAgentsPage() {
           {filteredAgents.map((agent) => (
             <div
               key={agent.id}
-              className="rounded-xl bg-card border border-border p-5 space-y-4 shadow-sm hover:border-primary/50 transition-all group"
+              className="rounded-xl bg-card border border-border p-5 space-y-4 hover:border-primary/50 transition-all group"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">

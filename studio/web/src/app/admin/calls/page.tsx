@@ -53,7 +53,7 @@ export default function AdminCallsPage() {
       />
 
       {/* Call Logs Table */}
-      <div className="rounded-xl bg-card border border-border p-6 space-y-4 shadow-sm">
+      <div className="rounded-xl bg-card border border-border p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-foreground">Recent Voice Sessions</h3>
           <span className="text-xs font-mono text-muted-foreground">{calls.length} Total Logs</span>
