@@ -129,7 +129,7 @@ services:
       NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/dashboard}
       AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
       STUDIO_SUPERADMIN_API_KEY: ${STUDIO_SUPERADMIN_API_KEY:-}
-      WATCHPACK_POLLING: "true"
+      NODE_ENV: ${NODE_ENV:-production}
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     volumes:
@@ -139,7 +139,13 @@ services:
       - studio_web_pnpm_store:/root/.local/share/pnpm/store
     depends_on:
       - studio-api
-    command: sh -c "pnpm install && pnpm dev -H 0.0.0.0"
+    command: >
+      sh -c "pnpm install &&
+             if [ \"$$NODE_ENV\" = \"development\" ]; then
+               pnpm dev -H 0.0.0.0;
+             else
+               pnpm build && pnpm start -H 0.0.0.0 -p 3000;
+             fi"
 
   # Caddy automated reverse proxy
   caddy:
