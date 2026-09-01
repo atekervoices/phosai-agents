@@ -188,3 +188,11 @@
     animation: wave 1.2s ease-in-out infinite;
   }
 }
+
+/* Hide Next.js development activity & compilation indicator badge */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dev-overlay-container] {
+  display: none !important;
+}
+
