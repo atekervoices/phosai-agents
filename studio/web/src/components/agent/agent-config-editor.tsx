@@ -645,9 +645,9 @@ export default function AgentConfigEditor({
                         label="Voice Settings"
                         description="Configure the provider, model, and vocal identity for synthetic speech"
                         className="items-start py-6 flex-col gap-4"
-                        childrenClassName="w-full ml-0"
+                        childrenClassName="w-full ml-0 pl-0 sm:pl-12"
                       >
-                        <div className="flex w-full items-center gap-3 pl-12 flex-wrap">
+                        <div className="flex w-full items-center gap-3 flex-wrap">
                           <div className="flex items-center gap-2">
                             {tts &&
                               (() => {
@@ -811,7 +811,7 @@ export default function AgentConfigEditor({
                       label="Conversation Mode"
                       description="Choose between the standard Builder LLM pipeline or native bidirectional audio"
                       className="items-start py-6 flex-col gap-4"
-                      childrenClassName="w-full ml-0 pl-12"
+                      childrenClassName="w-full ml-0 pl-0 sm:pl-12"
                     >
                       <Select
                         value={isGeminiLive ? "native" : "standard"}
@@ -836,7 +836,7 @@ export default function AgentConfigEditor({
                           patchField(payload);
                         }}
                       >
-                        <SelectTrigger className="h-9 w-[280px] text-xs font-bold px-3 border-border/60 bg-accent/30 rounded-lg hover:bg-accent/50 transition-colors">
+                        <SelectTrigger className="h-9 w-full sm:w-[280px] max-w-full text-xs font-bold px-3 border-border/60 bg-accent/30 rounded-lg hover:bg-accent/50 transition-colors">
                           <SelectValue>
                             {isGeminiLive
                               ? "Native Multimodal (Gemini Live)"
@@ -861,11 +861,11 @@ export default function AgentConfigEditor({
                       label="Human Handoff / Escalation"
                       description="Configure escalation destinations for telephony agents"
                       className="items-start py-6 flex-col gap-4"
-                      childrenClassName="w-full ml-0 pl-12"
+                      childrenClassName="w-full ml-0 pl-0 sm:pl-12"
                     >
-                      <div className="space-y-3">
+                      <div className="space-y-3 w-full max-w-full">
                         {escalationDestinations.map((dest, idx) => (
-                          <div key={dest.id} className="flex items-center gap-2">
+                          <div key={dest.id} className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full">
                             <input
                               type="text"
                               value={dest.name}
@@ -884,7 +884,7 @@ export default function AgentConfigEditor({
                               }}
                               placeholder="Name (e.g. Sales)"
                               disabled={saving === "escalation_destinations"}
-                              className="h-9 w-40 rounded-lg border border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50 transition-all"
+                              className="h-9 w-full sm:w-40 rounded-lg border border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50 transition-all"
                             />
                             <input
                               type="text"
@@ -904,7 +904,7 @@ export default function AgentConfigEditor({
                               }}
                               placeholder="Phone (e.g. +1234567890)"
                               disabled={saving === "escalation_destinations"}
-                              className="h-9 w-48 rounded-lg border border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50 transition-all font-mono"
+                              className="h-9 w-full sm:w-48 rounded-lg border border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40 disabled:opacity-50 transition-all font-mono"
                             />
                             <button
                               onClick={() => {
@@ -917,7 +917,7 @@ export default function AgentConfigEditor({
                                   escalation_destinations: valid.map(({ id: _, ...rest }) => rest),
                                 });
                               }}
-                              className="p-2 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/10"
+                              className="p-2 text-muted-foreground hover:text-red-500 transition-colors rounded-lg hover:bg-red-500/10 shrink-0"
                             >
                               <HugeiconsIcon icon={Cancel01Icon} className="size-4" />
                             </button>
@@ -1211,7 +1211,7 @@ function SettingRow({
 }: {
   icon: React.ReactNode;
   label: string;
-  description: React.ReactNode;
+  description: string;
   children: React.ReactNode;
   className?: string;
   childrenClassName?: string;
@@ -1219,22 +1219,22 @@ function SettingRow({
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-5 py-4 bg-transparent transition-all hover:bg-accent/2 group/row first:rounded-t-2xl last:rounded-b-2xl",
+        "flex flex-col sm:flex-row sm:items-center justify-between px-5 py-4 gap-3.5 bg-transparent transition-all hover:bg-accent/2 group/row first:rounded-t-2xl last:rounded-b-2xl overflow-hidden",
         className
       )}
     >
-      <div className="flex items-center gap-4 min-w-0 flex-1 w-full">
-        <div className="size-8 rounded-lg bg-accent/30 flex items-center justify-center text-muted-foreground shrink-0 group-hover/row:bg-primary/10 group-hover/row:text-primary transition-all duration-300">
+      <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1 w-full">
+        <div className="size-8 rounded-lg bg-accent/30 flex items-center justify-center text-muted-foreground shrink-0 group-hover/row:bg-primary/10 group-hover/row:text-primary transition-all duration-300 mt-0.5 sm:mt-0">
           {icon}
         </div>
-        <div className="min-w-0 flex flex-col gap-0.5">
+        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
           <div className="text-xs font-bold tracking-tight text-foreground">{label}</div>
           <div className="text-[10px] text-muted-foreground leading-snug font-medium">
             {description}
           </div>
         </div>
       </div>
-      <div className={cn("shrink-0 ml-4", childrenClassName)}>{children}</div>
+      <div className={cn("shrink-0 sm:ml-4 w-full sm:w-auto min-w-0 max-w-full", childrenClassName)}>{children}</div>
     </div>
   );
 }
@@ -1256,7 +1256,7 @@ function SelectField({
     <div className="flex items-center gap-2">
       <div className="relative">
         <Select value={value} onValueChange={onChange} disabled={saving}>
-          <SelectTrigger className="h-9 min-w-[140px] truncate rounded-lg border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground focus:ring-1 focus:ring-primary/40 hover:bg-accent/50 transition-all border">
+          <SelectTrigger className="h-9 min-w-[140px] max-w-full truncate rounded-lg border-border/60 bg-accent/30 px-3 text-xs font-bold text-foreground focus:ring-1 focus:ring-primary/40 hover:bg-accent/50 transition-all border">
             <SelectValue>{options.find((o) => o.value === value)?.label ?? value}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -1395,7 +1395,7 @@ function VoicePicker({
   );
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative w-full sm:w-auto max-w-full">
       {/* Trigger button */}
       <button
         type="button"
