@@ -388,6 +388,7 @@ impl SttProvider for PhosAiSttProvider {
         })
         .to_string();
         let _ = control_msg_tx.send(Message::Text(lang_cmd.into()));
+        info!("[phosai-stt] Sent initial language parameter: {}", target_lang);
 
         // Set post-speech silence duration (default 0.60s)
         let silence_val = std::env::var("PHOSAI_SILENCE_DURATION")
@@ -424,7 +425,7 @@ impl SttProvider for PhosAiSttProvider {
         tokio::spawn(async move {
             while let Some(msg) = control_incoming_rx.recv().await {
                 if let Message::Text(text) = msg {
-                    tracing::debug!("[phosai-stt] Control response: {}", text);
+                    info!("[phosai-stt] Control response: {}", text);
                 }
             }
         });
@@ -441,6 +442,7 @@ impl SttProvider for PhosAiSttProvider {
                         Ok(ServerDataEvent::RecordingStart) => {
                             info!("[phosai-stt] VAD speech start detected");
                             last_transcript.clear();
+                            sent_first_text = false;
                             sent_transcript_for_turn = false;
                         }
                         Ok(ServerDataEvent::Realtime {
@@ -481,19 +483,7 @@ impl SttProvider for PhosAiSttProvider {
                             }
                         }
                         Ok(ServerDataEvent::RecordingStop) => {
-                            info!("[phosai-stt] VAD speech stop detected");
-                            if !sent_transcript_for_turn {
-                                let cleaned = dedup_repeated_words(last_transcript.trim());
-                                if !cleaned.is_empty() {
-                                    if !sent_first_text {
-                                        let _ = result_tx.send(SttEvent::FirstTextReceived).await;
-                                    }
-                                    sent_first_text = false;
-                                    sent_transcript_for_turn = true;
-                                    let _ = result_tx.send(SttEvent::Transcript(cleaned)).await;
-                                    last_transcript.clear();
-                                }
-                            }
+                            info!("[phosai-stt] VAD speech stop detected, waiting for fullSentence...");
                         }
                         Ok(ServerDataEvent::FullSentence { text, .. }) => {
                             let raw = text.trim();
