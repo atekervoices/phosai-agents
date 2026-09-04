@@ -41,15 +41,17 @@ enum ServerDataEvent {
     RecordingStart,
     #[serde(rename = "realtime")]
     Realtime {
-        #[serde(default)]
         text: String,
+        is_final: bool,
+        speech_final: bool,
     },
     #[serde(rename = "recording_stop")]
     RecordingStop,
     #[serde(rename = "fullSentence")]
     FullSentence {
-        #[serde(default)]
         text: String,
+        is_final: bool,
+        speech_final: bool,
     },
 }
 
@@ -441,20 +443,40 @@ impl SttProvider for PhosAiSttProvider {
                             last_transcript.clear();
                             sent_transcript_for_turn = false;
                         }
-                        Ok(ServerDataEvent::Realtime { text }) => {
+                        Ok(ServerDataEvent::Realtime {
+                            text,
+                            is_final,
+                            ..
+                        }) => {
                             let raw = text.trim();
                             if !raw.is_empty() {
                                 let cleaned = dedup_repeated_words(raw);
-                                if !sent_first_text && !cleaned.is_empty() {
-                                    sent_first_text = true;
-                                    let _ = result_tx.send(SttEvent::FirstTextReceived).await;
-                                }
-                                if !cleaned.is_empty() {
-                                    info!("[phosai-stt] Realtime hypothesis: {:?}", cleaned);
-                                    last_transcript = cleaned.clone();
-                                    let _ = result_tx
-                                        .send(SttEvent::PartialTranscript(cleaned))
-                                        .await;
+                                if is_final {
+                                    info!("[phosai-stt] Final sentence (is_final=true): {:?}", cleaned);
+                                    if !cleaned.is_empty() {
+                                        last_transcript = cleaned.clone();
+                                        if !sent_transcript_for_turn {
+                                            if !sent_first_text {
+                                                let _ = result_tx.send(SttEvent::FirstTextReceived).await;
+                                            }
+                                            sent_first_text = false;
+                                            sent_transcript_for_turn = true;
+                                            let _ = result_tx.send(SttEvent::Transcript(cleaned)).await;
+                                            last_transcript.clear();
+                                        }
+                                    }
+                                } else {
+                                    if !sent_first_text && !cleaned.is_empty() {
+                                        sent_first_text = true;
+                                        let _ = result_tx.send(SttEvent::FirstTextReceived).await;
+                                    }
+                                    if !cleaned.is_empty() {
+                                        info!("[phosai-stt] Realtime hypothesis: {:?}", cleaned);
+                                        last_transcript = cleaned.clone();
+                                        let _ = result_tx
+                                            .send(SttEvent::PartialTranscript(cleaned))
+                                            .await;
+                                    }
                                 }
                             }
                         }
@@ -473,7 +495,7 @@ impl SttProvider for PhosAiSttProvider {
                                 }
                             }
                         }
-                        Ok(ServerDataEvent::FullSentence { text }) => {
+                        Ok(ServerDataEvent::FullSentence { text, .. }) => {
                             let raw = text.trim();
                             let cleaned = dedup_repeated_words(raw);
                             info!("[phosai-stt] Full sentence: {:?}", cleaned);
@@ -586,5 +608,44 @@ mod tests {
         assert_eq!(map_language_code("en", &map), "eng");
         assert_eq!(map_language_code("Swahili", &map), "swa");
         assert_eq!(map_language_code("swa", &map), "swa");
+    }
+
+    #[test]
+    fn test_server_data_event_deserialization() {
+        // Realtime interim with flags
+        let rt: ServerDataEvent = serde_json::from_str(
+            r#"{"type": "realtime", "text": "hello world", "is_final": false, "speech_final": false}"#,
+        )
+        .unwrap();
+        match rt {
+            ServerDataEvent::Realtime {
+                text,
+                is_final,
+                speech_final,
+            } => {
+                assert_eq!(text, "hello world");
+                assert!(!is_final);
+                assert!(!speech_final);
+            }
+            _ => panic!("Expected Realtime"),
+        }
+
+        // FullSentence with flags
+        let fs: ServerDataEvent = serde_json::from_str(
+            r#"{"type": "fullSentence", "text": "hello world", "is_final": true, "speech_final": true}"#,
+        )
+        .unwrap();
+        match fs {
+            ServerDataEvent::FullSentence {
+                text,
+                is_final,
+                speech_final,
+            } => {
+                assert_eq!(text, "hello world");
+                assert!(is_final);
+                assert!(speech_final);
+            }
+            _ => panic!("Expected FullSentence"),
+        }
     }
 }
