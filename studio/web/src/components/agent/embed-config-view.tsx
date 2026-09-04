@@ -46,6 +46,7 @@ export default function EmbedConfigView({ agentId, agentName = "Voice Agent" }: 
   const [position, setPosition] = useState<EmbedPosition>("bottom-right");
   const [title, setTitle] = useState(agentName);
   const [autoOpen, setAutoOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"chat" | "voice">("chat");
   const [origin, setOrigin] = useState<string>("");
 
   useEffect(() => {
