@@ -1219,7 +1219,7 @@ function SettingRow({
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row sm:items-center justify-between px-5 py-4 gap-3.5 bg-transparent transition-all hover:bg-accent/2 group/row first:rounded-t-2xl last:rounded-b-2xl overflow-hidden",
+        "flex flex-col sm:flex-row sm:items-center justify-between px-5 py-4 gap-3.5 bg-transparent transition-all hover:bg-accent/2 group/row first:rounded-t-2xl last:rounded-b-2xl",
         className
       )}
     >
@@ -1395,7 +1395,7 @@ function VoicePicker({
   );
 
   return (
-    <div ref={containerRef} className="relative w-full sm:w-auto max-w-full">
+    <div ref={containerRef} className={cn("relative w-full sm:w-auto max-w-full", open && "z-50")}>
       {/* Trigger button */}
       <button
         type="button"
