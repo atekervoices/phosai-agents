@@ -390,11 +390,11 @@ impl SttProvider for PhosAiSttProvider {
         let _ = control_msg_tx.send(Message::Text(lang_cmd.into()));
         info!("[phosai-stt] Sent initial language parameter: {}", target_lang);
 
-        // Set post-speech silence duration (default 0.60s)
+        // Set post-speech silence duration (default 0.85s to allow natural pauses without cutoff)
         let silence_val = std::env::var("PHOSAI_SILENCE_DURATION")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(0.60);
+            .unwrap_or(0.85);
         let silence_cmd = serde_json::json!({
             "command": "set_parameter",
             "parameter": "post_speech_silence_duration",
@@ -403,11 +403,11 @@ impl SttProvider for PhosAiSttProvider {
         .to_string();
         let _ = control_msg_tx.send(Message::Text(silence_cmd.into()));
 
-        // Set VAD sensitivity (default 0.55 for balanced speech detection)
+        // Set VAD sensitivity (default 0.65 to cleanly catch initial speech onsets)
         let sens_val = std::env::var("PHOSAI_SILERO_SENSITIVITY")
             .ok()
             .and_then(|s| s.parse::<f64>().ok())
-            .unwrap_or(0.55);
+            .unwrap_or(0.65);
         let sens_cmd = serde_json::json!({
             "command": "set_parameter",
             "parameter": "silero_sensitivity",
