@@ -28,15 +28,16 @@ use crate::types::TtsEvent;
 // Both the HTTP and WS paths accumulate tokens and flush at sentence
 // boundaries for better synthesis quality.
 
-/// Punctuation marks for fragment boundaries (matching sparktts.py line 466).
+/// Sentence-ending punctuation marks for complete sentence boundaries.
+/// Commas (,), semicolons (;), and colons (:) are intentional parts of sentences and are NOT split on.
 const PUNCT_MARKS: &[char] = &[
-    '.', '!', '?', ',', ';', ':', '\n',
+    '.', '!', '?', '\n',
     '\u{3002}', '\u{FF01}', '\u{FF1F}'
 ];
 
-/// Extract next fragment matching Python tts.py:
-/// 1. Finds earliest punctuation mark in `buffer`. Slices up to and including punctuation.
-/// 2. If no punctuation and `buffer` > 80 chars, finds last space (> 20 chars) and slices there.
+/// Extract next fragment:
+/// 1. Finds earliest sentence terminator in `buffer`. Slices up to and including punctuation.
+/// 2. If no sentence punctuation and `buffer` > 200 chars, finds last space (> 40 chars) and slices there.
 fn extract_next_fragment(buffer: &mut String) -> Option<String> {
     let mut earliest_pos: Option<usize> = None;
     for (idx, ch) in buffer.char_indices() {
@@ -54,9 +55,9 @@ fn extract_next_fragment(buffer: &mut String) -> Option<String> {
         return Some(raw_chunk);
     }
 
-    if buffer.chars().count() > 80 {
+    if buffer.chars().count() > 200 {
         if let Some(last_space) = buffer.rfind(' ') {
-            if last_space > 20 {
+            if last_space > 40 {
                 let raw_chunk = buffer[..last_space].to_string();
                 *buffer = buffer[last_space..].trim_start().to_string();
                 return Some(raw_chunk);
@@ -305,10 +306,10 @@ impl TtsStage {
                                 }
                             }
 
-                            // Long buffer fallback (matching sparktts.py line 498: > 80 chars)
-                            if buffer.len() > 80 {
+                            // Long buffer fallback (> 200 chars)
+                            if buffer.len() > 200 {
                                 if let Some(last_space) = buffer.rfind(' ') {
-                                    if last_space > 20 {
+                                    if last_space > 40 {
                                         let send_raw = buffer[..last_space].trim().to_string();
                                         buffer = buffer[last_space..].trim_start().to_string();
                                         if !send_raw.is_empty() {
