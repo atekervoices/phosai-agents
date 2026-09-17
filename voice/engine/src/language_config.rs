@@ -451,6 +451,41 @@ pub const SUPPORTED_LANGUAGES: &[LanguageOption] = &[
         deepgram_code: "en",
         cartesia_code: "en",
     },
+    LanguageOption {
+        code: "sw",
+        label: "Swahili",
+        elevenlabs_code: "sw",
+        deepgram_code: "sw",
+        cartesia_code: "sw",
+    },
+    LanguageOption {
+        code: "swa",
+        label: "Swahili (Regional)",
+        elevenlabs_code: "sw",
+        deepgram_code: "sw",
+        cartesia_code: "sw",
+    },
+    LanguageOption {
+        code: "lgg",
+        label: "Lugbara",
+        elevenlabs_code: "lg",
+        deepgram_code: "lg",
+        cartesia_code: "lg",
+    },
+    LanguageOption {
+        code: "ttj",
+        label: "Rutooro",
+        elevenlabs_code: "to",
+        deepgram_code: "to",
+        cartesia_code: "to",
+    },
+    LanguageOption {
+        code: "myx",
+        label: "Lumasaba",
+        elevenlabs_code: "mas",
+        deepgram_code: "mas",
+        cartesia_code: "mas",
+    },
 ];
 
 /// ElevenLabs model IDs that accept the `language_code` URL parameter.
@@ -1223,6 +1258,22 @@ pub const STT_MODEL_CATALOG: &[SttModelSpec] = &[
         supported_languages: &[
             "en", "es", "fr", "de", "pt", "it", "ja", "ko", "zh", "ar", "hi", "nl", "ru", "pl",
             "sv",
+        ],
+    },
+    SttModelSpec {
+        provider: "phosai-stt",
+        model_id: "phosai-stt-v1",
+        label: "PhosAI STT v1",
+        supported_languages: &[
+            "lug", "ach", "teo", "sw", "swa", "kin", "lgg", "nyn", "xog", "ttj", "myx", "en",
+        ],
+    },
+    SttModelSpec {
+        provider: "phostt",
+        model_id: "phosai-stt-v1",
+        label: "PhosAI STT v1",
+        supported_languages: &[
+            "lug", "ach", "teo", "sw", "swa", "kin", "lgg", "nyn", "xog", "ttj", "myx", "en",
         ],
     },
 

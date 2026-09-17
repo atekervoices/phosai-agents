@@ -87,13 +87,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
       STT_PROVIDER: ${STT_PROVIDER:-phosai-stt}
-      STT_BASE_URL: ${STT_BASE_URL:-https://speaches.atekervoices.com/v1}
-      STT_MODEL: ${STT_MODEL:-Achuka/etoil-whisper-stt}
+      STT_BASE_URL: ${STT_BASE_URL:-https://whisper-stt.atekervoices.com}
+      STT_MODEL: ${STT_MODEL:-phosai-stt-v1}
       STT_API_KEY: ${STT_API_KEY:-}
-      PHOSAI_STT_CONTROL_URL: ${PHOSAI_STT_CONTROL_URL:-ws://stt-control.atekervoices.com/control}
-      PHOSAI_STT_DATA_URL: ${PHOSAI_STT_DATA_URL:-ws://stt-data.atekervoices.com/data}
-      PHOSAI_SILERO_SENSITIVITY: ${PHOSAI_SILERO_SENSITIVITY:-0.55}
-      PHOSAI_SILENCE_DURATION: ${PHOSAI_SILENCE_DURATION:-0.60}
       TTS_PROVIDER: ${TTS_PROVIDER:-phosai-ws}
       TTS_BASE_URL: ${TTS_BASE_URL:-https://tts.atekervoices.com}
       TTS_MODEL: ${TTS_MODEL:-spark-tts}

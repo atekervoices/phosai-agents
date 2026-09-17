@@ -567,13 +567,13 @@ async fn agent_config_for_id(
             stt.provider.clone()
         },
         stt_model: if stt.model.is_empty() {
-            std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-realtime".to_string())
+            std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-stt-v1".to_string())
         } else {
             stt.model.clone()
         },
         stt_base_url: if stt.base_url.is_empty() {
             std::env::var("STT_BASE_URL")
-                .unwrap_or_else(|_| "ws://stt-control.atekervoices.com/control".to_string())
+                .unwrap_or_else(|_| "https://whisper-stt.atekervoices.com".to_string())
         } else {
             stt.base_url.clone()
         },

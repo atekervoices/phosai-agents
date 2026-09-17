@@ -23,6 +23,7 @@
 //! | `openai-realtime`  | Streaming WS  | OpenAI Realtime (`gpt-4o-transcribe`, base64 JSON) |
 //! | `openai-whisper`   | Segmented HTTP | OpenAI Whisper (`gpt-4o-transcribe`, multipart) |
 //! | `groq`             | Segmented HTTP | Groq Whisper (`whisper-large-v3-turbo`) |
+//! | `phosai-stt`       | Segmented HTTP | PhosAI STT (`phosai-stt-v1`) |
 //! | `elevenlabs`       | Segmented HTTP | ElevenLabs (`scribe_v2`, multipart) |
 
 pub mod builtin;
@@ -33,7 +34,7 @@ pub mod elevenlabs;
 pub mod groq;
 pub mod openai_realtime;
 pub mod openai_whisper;
-pub mod phosai_stt;
+pub mod phostt;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -162,11 +163,18 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
             &cfg.model,
             base_lang, // ISO-639-1 only
         )),
-        "phosai" | "phosai-stt" | "phosai_stt" => Box::new(phosai_stt::PhosAiSttProvider::new(
+        "phostt"
+        | "phosai"
+        | "phosai-stt"
+        | "phosai_stt"
+        | "phosai-http"
+        | "phosai-stt-http"
+        | "phos-whisper"
+        | "phosai-whisper" => Box::new(phostt::PhosttSttProvider::new(
             &cfg.base_url,
             &cfg.api_key,
             &cfg.model,
-            if cfg.language.is_empty() { "eng" } else { &cfg.language },
+            &cfg.language,
         )),
         _ => {
             // "builtin" or any unrecognised tag → speech-inference WS provider
@@ -193,7 +201,7 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
 /// | Category              | Providers                                   | P99     |
 /// |-----------------------|---------------------------------------------|---------|
 /// | Streaming WS          | `deepgram`, `cartesia`, `openai-realtime`   | 600 ms  |
-/// | Segmented HTTP (fast) | `groq`                                      | 1000 ms |
+/// | Segmented HTTP (fast) | `groq`, `phosai-stt`                        | 1000 ms |
 /// | Segmented HTTP (med)  | `openai-whisper`                            | 1200 ms |
 /// | Segmented HTTP (slow) | `elevenlabs`                                | 1500 ms |
 /// | builtin / unknown     | all others                                  | 1000 ms |
@@ -206,9 +214,9 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
 pub fn default_stt_p99_latency_ms(provider: &str) -> u32 {
     match provider {
         // Streaming WS — incremental processing, fast finalize → transcript
-        "deepgram" | "cartesia" | "openai-realtime" | "phosai" | "phosai-stt" | "phosai_stt" => 600,
+        "deepgram" | "cartesia" | "openai-realtime" => 600,
         // Segmented HTTP — upload + inference round-trip
-        "groq" => 1000,
+        "groq" | "phosai-stt" => 1000,
         "openai-whisper" => 1200,
         "elevenlabs" => 1500,
         // builtin (speech-inference) or unrecognised
@@ -236,9 +244,10 @@ mod tests {
     #[test]
     fn segmented_http_providers_match_table() {
         assert_eq!(default_stt_p99_latency_ms("groq"), 1000);
+        assert_eq!(default_stt_p99_latency_ms("phosai-stt"), 1000);
         assert_eq!(default_stt_p99_latency_ms("openai-whisper"), 1200);
         assert_eq!(default_stt_p99_latency_ms("elevenlabs"), 1500);
-    }
+    }       
 
     // Unknown / builtin providers fall back to the conservative default.
     #[test]

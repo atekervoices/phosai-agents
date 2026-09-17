@@ -633,9 +633,6 @@ const STT_WS_PROVIDERS = new Set([
   "deepgram", // STT — Deepgram nova-3 WS
   "cartesia", // STT — Cartesia Ink Whisper WS
   "openai-realtime", // STT — GPT-4o Realtime WS
-  "phosai-stt", // STT — PhosAI Real-Time dual-WS ASR
-  "phosai",
-  "phosai_stt",
 ]);
 
 function getProviderCategory(value: string, type: "stt" | "tts"): "self-hosted" | "ws" | "http" {
@@ -724,7 +721,7 @@ function VoiceProviderCard({
   useEffect(() => {
     let active = true;
     const fetchCatalog = async () => {
-      if (!provider || provider === "faster-whisper" || provider === "fish-speech" || provider === "phosai-stt" || provider === "phosai") {
+      if (!provider || provider === "faster-whisper" || provider === "fish-speech") {
         if (active) setModelCatalog([]);
         return;
       }
