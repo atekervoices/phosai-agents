@@ -57,16 +57,30 @@ pub fn normalize_phostt_language(lang: &str) -> String {
 
 /// Resolves the transcription endpoint URL from base_url or environment variables.
 fn resolve_phostt_url(base_url: &str) -> String {
-    let resolved = if !base_url.is_empty() {
+    let resolved = if !base_url.is_empty()
+        && !base_url.contains("control.atekervoices.com")
+        && !base_url.contains("stt-control")
+        && !base_url.starts_with("ws://")
+        && !base_url.starts_with("wss://")
+    {
         base_url.to_string()
     } else {
-        std::env::var("PHOSTT_URL")
+        std::env::var("PHOSAI_STT_URL")
+            .or_else(|_| std::env::var("PHOSTT_URL"))
             .or_else(|_| std::env::var("VOICEBOX_STT_URL"))
             .or_else(|_| std::env::var("NEXVOX_STT_URL"))
             .unwrap_or_else(|_| "https://whisper-stt.atekervoices.com".to_string())
     };
 
-    let trimmed = resolved.trim_end_matches('/');
+    let cleaned = if resolved.starts_with("ws://") {
+        format!("http://{}", resolved.trim_start_matches("ws://"))
+    } else if resolved.starts_with("wss://") {
+        format!("https://{}", resolved.trim_start_matches("wss://"))
+    } else {
+        resolved
+    };
+
+    let trimmed = cleaned.trim_end_matches('/');
     if trimmed.ends_with("/audio/transcriptions") {
         trimmed.to_string()
     } else if trimmed.ends_with("/v1") {
