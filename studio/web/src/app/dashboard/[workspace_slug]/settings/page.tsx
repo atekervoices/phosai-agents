@@ -633,6 +633,9 @@ const STT_WS_PROVIDERS = new Set([
   "deepgram", // STT — Deepgram nova-3 WS
   "cartesia", // STT — Cartesia Ink Whisper WS
   "openai-realtime", // STT — GPT-4o Realtime WS
+  "phosai-stt", // STT — PhosAI Real-Time WebSocket ASR
+  "phosai-realtime",
+  "phosai",
 ]);
 
 function getProviderCategory(value: string, type: "stt" | "tts"): "self-hosted" | "ws" | "http" {

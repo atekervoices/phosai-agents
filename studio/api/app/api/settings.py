@@ -316,7 +316,7 @@ STT_PROVIDERS: list[VoiceProviderOption] = [
     VoiceProviderOption(
         value="phosai-stt",
         label="PhosAI STT",
-        description="PhosAI Whisper STT — segmented HTTP transcription",
+        description="PhosAI Real-Time WebSocket Streaming ASR",
         docs_url="https://whisper-stt.atekervoices.com/docs",
         default_base_url="https://whisper-stt.atekervoices.com",
         fields=[
