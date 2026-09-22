@@ -30,6 +30,9 @@
 //!
 //! Ref: <https://whisper-stt.atekervoices.com/docs>
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use secrecy::{ExposeSecret, SecretString};
@@ -61,6 +64,24 @@ pub fn normalize_phosai_language(lang: &str) -> String {
         "" => "lug".to_string(),
         other => other.to_string(),
     }
+}
+
+/// Helper to append a recognized segment to the accumulated transcript without duplicate repetitions.
+fn append_chunk(accumulated: &mut String, chunk: &str) {
+    let clean = chunk.trim();
+    if clean.is_empty() {
+        return;
+    }
+    if accumulated.is_empty() {
+        accumulated.push_str(clean);
+        return;
+    }
+    // Avoid duplicating if accumulated already ends with this exact chunk
+    if accumulated.ends_with(clean) {
+        return;
+    }
+    accumulated.push(' ');
+    accumulated.push_str(clean);
 }
 
 /// Resolves the WebSocket Realtime endpoint URL.
@@ -123,6 +144,7 @@ pub struct PhosaiRealtimeSttProvider {
     result_rx: Option<mpsc::Receiver<SttEvent>>,
     /// Non-blocking channel for raw 16kHz PCM audio frames.
     audio_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    finalize_pending: Arc<AtomicBool>,
 }
 
 impl PhosaiRealtimeSttProvider {
@@ -143,6 +165,7 @@ impl PhosaiRealtimeSttProvider {
             conn_msg_tx: None,
             result_rx: None,
             audio_tx: None,
+            finalize_pending: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -242,9 +265,14 @@ impl SttProvider for PhosaiRealtimeSttProvider {
         self.result_rx = Some(result_rx);
         self.audio_tx = Some(audio_tx);
 
+        let finalize_pending = Arc::clone(&self.finalize_pending);
+
         // ── Reader task ─────────────────────────────────────────────────
         tokio::spawn(async move {
             let mut sent_first_text = false;
+            let mut speech_active = false;
+            let mut accumulated_transcript = String::new();
+            let mut sent_transcript_for_turn = false;
 
             while let Some(msg) = incoming_rx.recv().await {
                 if let Message::Text(text) = msg {
@@ -257,7 +285,8 @@ impl SttProvider for PhosaiRealtimeSttProvider {
 
                     match evt_type {
                         "session.created" | "transcription_session.created" => {
-                            debug!("[phosai-realtime-stt] Session created, sending config");
+                            debug!("[phosai-realtime-stt] Session created, configuring with model={}, lang={}", model, language);
+                            // Do not disable turn_detection: allows server VAD to emit speech_started and speech_stopped naturally
                             let update = json!({
                                 "type": "session.update",
                                 "session": {
@@ -265,8 +294,7 @@ impl SttProvider for PhosaiRealtimeSttProvider {
                                     "input_audio_transcription": {
                                         "model": model,
                                         "language": language
-                                    },
-                                    "turn_detection": null
+                                    }
                                 }
                             });
                             let _ = reply_tx.send(Message::Text(update.to_string().into()));
@@ -276,15 +304,46 @@ impl SttProvider for PhosaiRealtimeSttProvider {
                             debug!("[phosai-realtime-stt] Session configured and ready");
                         }
 
+                        // VAD Speech Start
+                        "input_audio_buffer.speech_started" | "recording_start" => {
+                            debug!("[phosai-realtime-stt] VAD speech started");
+                            speech_active = true;
+                            accumulated_transcript.clear();
+                            sent_first_text = false;
+                            sent_transcript_for_turn = false;
+                        }
+
+                        // VAD Speech Stop
+                        "input_audio_buffer.speech_stopped" | "recording_stop" => {
+                            debug!("[phosai-realtime-stt] VAD speech stopped");
+                            speech_active = false;
+
+                            // If we already have accumulated text from prior done/fullSentence chunks,
+                            // flush it now as the finalized turn transcript.
+                            let trimmed = accumulated_transcript.trim();
+                            if !trimmed.is_empty() && !sent_transcript_for_turn {
+                                info!("[phosai-realtime-stt] Flushing accumulated transcript on speech_stop: {:?}", trimmed);
+                                sent_transcript_for_turn = true;
+                                let final_text = trimmed.to_string();
+                                accumulated_transcript.clear();
+                                let _ = result_tx.send(SttEvent::Transcript(final_text)).await;
+                            }
+                        }
+
                         // Streaming partial hypothesis / delta
                         "conversation.item.input_audio_transcription.delta"
                         | "response.audio_transcript.delta"
                         | "realtime" => {
+                            let is_final = event.get("is_final").and_then(|v| v.as_bool()).unwrap_or(false)
+                                || event.get("speech_final").and_then(|v| v.as_bool()).unwrap_or(false);
+
                             let delta = event
                                 .get("delta")
                                 .or_else(|| event.get("text"))
+                                .or_else(|| event.get("transcript"))
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
+                                .trim()
                                 .to_string();
 
                             if !delta.is_empty() {
@@ -292,7 +351,28 @@ impl SttProvider for PhosaiRealtimeSttProvider {
                                     sent_first_text = true;
                                     let _ = result_tx.send(SttEvent::FirstTextReceived).await;
                                 }
-                                let _ = result_tx.send(SttEvent::PartialTranscript(delta)).await;
+
+                                if is_final {
+                                    append_chunk(&mut accumulated_transcript, &delta);
+                                    let is_commit_or_stopped = !speech_active || finalize_pending.swap(false, Ordering::SeqCst);
+                                    if is_commit_or_stopped && !sent_transcript_for_turn {
+                                        sent_transcript_for_turn = true;
+                                        let final_text = accumulated_transcript.trim().to_string();
+                                        accumulated_transcript.clear();
+                                        info!("[phosai-realtime-stt] Final Transcript (is_final=true): {:?}", final_text);
+                                        let _ = result_tx.send(SttEvent::Transcript(final_text)).await;
+                                    } else {
+                                        let _ = result_tx.send(SttEvent::PartialTranscript(accumulated_transcript.clone())).await;
+                                    }
+                                } else {
+                                    // Live interim hypothesis: combine with accumulated chunks for full display
+                                    let live_display = if accumulated_transcript.is_empty() {
+                                        delta
+                                    } else {
+                                        format!("{} {}", accumulated_transcript.trim(), delta)
+                                    };
+                                    let _ = result_tx.send(SttEvent::PartialTranscript(live_display)).await;
+                                }
                             }
                         }
 
@@ -301,30 +381,45 @@ impl SttProvider for PhosaiRealtimeSttProvider {
                         | "response.audio_transcript.done"
                         | "transcription.completed"
                         | "fullSentence" => {
-                            let transcript = event
+                            let piece = event
                                 .get("transcript")
                                 .or_else(|| event.get("text"))
+                                .or_else(|| event.get("delta"))
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .trim()
                                 .to_string();
 
-                            info!("[phosai-realtime-stt] Final Transcript: {:?}", transcript);
-                            if !transcript.is_empty() {
+                            let is_explicit_final = event.get("is_final").and_then(|v| v.as_bool()).unwrap_or(false)
+                                || event.get("speech_final").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                            if !piece.is_empty() {
                                 if !sent_first_text {
+                                    sent_first_text = true;
                                     let _ = result_tx.send(SttEvent::FirstTextReceived).await;
                                 }
-                                sent_first_text = false;
-                                let _ = result_tx.send(SttEvent::Transcript(transcript)).await;
+                                append_chunk(&mut accumulated_transcript, &piece);
                             }
-                        }
 
-                        "input_audio_buffer.speech_started" => {
-                            debug!("[phosai-realtime-stt] Remote VAD: speech started");
-                        }
+                            let trimmed = accumulated_transcript.trim();
+                            let is_commit_or_stopped = !speech_active
+                                || finalize_pending.swap(false, Ordering::SeqCst)
+                                || is_explicit_final;
 
-                        "input_audio_buffer.speech_stopped" => {
-                            debug!("[phosai-realtime-stt] Remote VAD: speech stopped");
+                            if is_commit_or_stopped {
+                                if !trimmed.is_empty() && !sent_transcript_for_turn {
+                                    sent_transcript_for_turn = true;
+                                    let final_text = trimmed.to_string();
+                                    accumulated_transcript.clear();
+                                    info!("[phosai-realtime-stt] Final Transcript: {:?}", final_text);
+                                    let _ = result_tx.send(SttEvent::Transcript(final_text)).await;
+                                }
+                            } else {
+                                // Speech is still active: emit accumulated text as PartialTranscript so UI stays updated
+                                if !trimmed.is_empty() {
+                                    let _ = result_tx.send(SttEvent::PartialTranscript(trimmed.to_string())).await;
+                                }
+                            }
                         }
 
                         "error" | "conversation.item.input_audio_transcription.failed" => {
@@ -369,6 +464,7 @@ impl SttProvider for PhosaiRealtimeSttProvider {
 
     /// Commit the audio buffer so the server finalizes and transcribes immediately.
     fn finalize(&self) {
+        self.finalize_pending.store(true, Ordering::SeqCst);
         let Some(tx) = &self.conn_msg_tx else { return };
         let msg = r#"{"type":"input_audio_buffer.commit"}"#;
         let _ = tx.send(Message::Text(msg.to_string().into()));
