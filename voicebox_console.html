@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voicebox Realtime Console</title>
+    <style>
+        :root {
+            --bg-body: #0d0f12;
+            --bg-surface: #15181e;
+            --bg-surface-subtle: #1a1e26;
+            --bg-input: #0f1115;
+            --border-color: #232731;
+            --border-hover: #373e4f;
+            --border-active: #3b82f6;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --btn-primary-bg: #2563eb;
+            --btn-primary-hover: #1d4ed8;
+            --btn-secondary-bg: #20242d;
+            --btn-secondary-hover: #292e3a;
+            --btn-danger-bg: #dc2626;
+            --btn-danger-hover: #b91c1c;
+            --status-connected: #10b981;
+            --status-speaking: #3b82f6;
+            --status-disconnected: #6b7280;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            --radius: 6px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Top Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title h1 {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+        }
+
+        .header-title .tag {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-family: var(--font-mono);
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #20242d;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .connection-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--status-disconnected);
+            display: inline-block;
+        }
+
+        .status-dot.connected {
+            background: var(--status-connected);
+        }
+
+        .status-dot.speaking {
+            background: var(--status-speaking);
+        }
+
+        /* Configuration Panel */
+        .config-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .grid-config {
+            display: grid;
+            grid-template-columns: 2fr 1.2fr 1.2fr 1.5fr;
+            gap: 14px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-config {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .grid-config {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+        }
+
+        input, select {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            padding: 8px 10px;
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--border-active);
+        }
+
+        /* Navigation Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius);
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: var(--bg-surface-subtle);
+        }
+
+        .tab-btn.active {
+            color: #ffffff;
+            background: var(--bg-surface);
+            border-color: var(--border-color);
+        }
+
+        /* Content Layout */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 860px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+        }
+
+        /* Buttons */
+        .button-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--btn-primary-bg);
+            color: #ffffff;
+            border: 1px solid transparent;
+            padding: 7px 14px;
+            border-radius: var(--radius);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--btn-primary-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--btn-secondary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: var(--btn-secondary-hover);
+            border-color: var(--border-hover);
+        }
+
+        .btn-danger {
+            background: var(--btn-danger-bg);
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: var(--btn-danger-hover);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        /* 3D Iridescent WebGL Voice Orb Stage (from Phosai Mobile) */
+        .orb-stage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 18px 0 14px 0;
+            background: radial-gradient(circle at center, rgba(37, 99, 235, 0.08) 0%, rgba(15, 17, 21, 0.75) 75%);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        #aui-orb {
+            width: 154px;
+            height: 154px;
+            display: block;
+            border-radius: 50%;
+            cursor: pointer;
+            filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.35));
+            transition: filter 0.3s ease, transform 0.2s ease;
+        }
+
+        #aui-orb:hover {
+            transform: scale(1.03);
+            filter: drop-shadow(0 0 32px rgba(59, 130, 246, 0.55));
+        }
+
+        .orb-caption {
+            margin-top: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .telemetry-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            padding: 6px 10px;
+            background: var(--bg-surface-subtle);
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+        }
+
+        .telemetry-row strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Transcript Box */
+        .transcript-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px;
+            min-height: 180px;
+            max-height: 320px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+
+        .transcript-empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .transcript-delta {
+            color: var(--text-secondary);
+            background: rgba(59, 130, 246, 0.1);
+            padding: 1px 3px;
+            border-radius: 3px;
+        }
+
+        /* Event Feed */
+        .logs-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 8px;
+            height: 380px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 8px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .log-entry:hover {
+            background: var(--bg-surface-subtle);
+        }
+
+        .log-time {
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .log-dir {
+            font-weight: 600;
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 9px;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+
+        .log-dir.in {
+            background: #1e3a8a;
+            color: #93c5fd;
+        }
+
+        .log-dir.out {
+            background: #064e3b;
+            color: #6ee7b7;
+        }
+
+        .log-dir.info {
+            background: #27272a;
+            color: #d4d4d8;
+        }
+
+        .log-dir.err {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .log-msg {
+            color: var(--text-primary);
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="header-title">
+                <h1>Voicebox Realtime Console</h1>
+                <span class="tag">OpenAI-Compatible</span>
+            </div>
+            <div class="connection-badge">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="connection-status">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Configuration Bar -->
+        <div class="config-card">
+            <div class="grid-config">
+                <div class="form-group">
+                    <label for="server-url">Server Base URL</label>
+                    <input type="text" id="server-url" value="" placeholder="http://localhost:8790">
+                </div>
+                <div class="form-group">
+                    <label for="model-select">Model ID</label>
+                    <input type="text" id="model-select" value="phosai-stt-v1">
+                </div>
+                <div class="form-group">
+                    <label for="lang-select">Language</label>
+                    <select id="lang-select">
+                        <option value="auto">Auto Detect (Code-Switching)</option>
+                        <option value="en" selected>English (en)</option>
+                        <option value="lug">Luganda (lug)</option>
+                        <option value="swa">Swahili (swa)</option>
+                        <option value="ach">Acholi (ach)</option>
+                        <option value="teo">Ateso (teo)</option>
+                        <option value="kin">Kinyarwanda (kin)</option>
+                        <option value="lgg">Lugbara (lgg)</option>
+                        <option value="nyn">Runyankole (nyn)</option>
+                        <option value="xog">Lusoga (xog)</option>
+                        <option value="ttj">Rutooro (ttj)</option>
+                        <option value="myx">Lumasaba (myx)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="api-key">API Key (Optional)</label>
+                    <input type="password" id="api-key" placeholder="Bearer Token">
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-ws" onclick="switchTab('ws')">WebSocket Realtime (/v1/realtime)</button>
+            <button class="tab-btn" id="tab-rtc" onclick="switchTab('rtc')">WebRTC Session & SDP (/v1/realtime/sessions)</button>
+        </div>
+
+        <!-- Tab 1: WebSocket Realtime -->
+        <div id="content-ws">
+            <div class="grid-2">
+                <!-- Left Pane: Audio Streaming -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Microphone Stream</span>
+                        <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="vad-badge">VAD: Idle</span>
+                    </div>
+
+                    <div class="button-bar">
+                        <button class="btn" id="btn-ws-connect" onclick="toggleWebSocket()">Connect</button>
+                        <button class="btn btn-secondary" id="btn-mic" onclick="toggleMicrophone()" disabled>Start Microphone</button>
+                        <button class="btn btn-secondary" id="btn-commit" onclick="commitBuffer()" disabled>Commit Buffer</button>
+                        <button class="btn btn-secondary" id="btn-clear" onclick="clearBuffer()" disabled>Clear</button>
+                    </div>
+
+                    <div class="orb-stage">
+                        <canvas id="aui-orb" width="320" height="320" title="Click to Connect or toggle Microphone"></canvas>
+                        <div class="orb-caption" id="orb-caption">Ready</div>
+                    </div>
+
+                    <div class="telemetry-row">
+                        <span>Rate: <strong id="telemetry-rate">16,000 Hz</strong></span>
+                        <span>Chunks: <strong id="chunks-count">0</strong></span>
+                        <span>State: <strong id="vad-state">Inactive</strong></span>
+                    </div>
+
+                    <div class="panel-header" style="margin-top: 6px;">
+                        <span class="panel-title">Streaming Transcript</span>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-secondary btn-sm" onclick="copyTranscript()">Copy</button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearTranscript()">Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="transcript-box" id="transcript-container">
+                        <span class="transcript-empty" id="transcript-placeholder">Transcription will stream here automatically as you speak...</span>
+                        <span id="transcript-committed"></span>
+                        <span class="transcript-delta" id="transcript-delta" style="display: none;"></span>
+                    </div>
+                </div>
+
+                <!-- Right Pane: Realtime Events -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Event Feed</span>
+                        <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Clear</button>
+                    </div>
+                    <div class="logs-box" id="logs-feed"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: WebRTC Session & SDP -->
+        <div id="content-rtc" style="display: none;">
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">WebRTC Session & SDP Signaling</span>
+                </div>
+                <div class="button-bar">
+                    <button class="btn" id="btn-test-session" onclick="testCreateSession()">Test POST /v1/realtime/sessions</button>
+                    <button class="btn btn-secondary" id="btn-test-sdp" onclick="testSdpOffer()">Test POST /v1/realtime (SDP)</button>
+                </div>
+                <div class="logs-box" id="rtc-results" style="height: 380px;">
+                    <div class="log-entry">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-dir info">INFO</span>
+                        <span class="log-msg">Click a button above to test WebRTC session creation or SDP exchange.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set default server URL from current window origin
+        const serverUrlInput = document.getElementById('server-url');
+        if (window.location.protocol.startsWith('http')) {
+            serverUrlInput.value = window.location.origin;
+        } else {
+            serverUrlInput.value = 'http://localhost:8790';
+        }
+
+        // Global State
+        let ws = null;
+        let audioContext = null;
+        let mediaStream = null;
+        let processor = null;
+        let analyser = null;
+        let dataArray = null;
+        let isRecording = false;
+        let chunkCount = 0;
+        let fullTranscript = '';
+
+        // UI Helpers
+        function setStatus(text, state) {
+            document.getElementById('connection-status').innerText = text;
+            const dot = document.getElementById('status-dot');
+            dot.className = 'status-dot';
+            if (state) dot.classList.add(state);
+        }
+
+        function log(msg, dir = 'info') {
+            const feed = document.getElementById('logs-feed');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'log-time';
+            timeSpan.innerText = timeStr;
+
+            const dirSpan = document.createElement('span');
+            dirSpan.className = `log-dir ${dir}`;
+            dirSpan.innerText = dir.toUpperCase();
+
+            const msgSpan = document.createElement('span');
+            msgSpan.className = 'log-msg';
+            msgSpan.innerText = msg;
+
+            entry.appendChild(timeSpan);
+            entry.appendChild(dirSpan);
+            entry.appendChild(msgSpan);
+
+            feed.appendChild(entry);
+            feed.scrollTop = feed.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs-feed').innerHTML = '';
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tab-ws').classList.toggle('active', tab === 'ws');
+            document.getElementById('tab-rtc').classList.toggle('active', tab === 'rtc');
+            document.getElementById('content-ws').style.display = tab === 'ws' ? 'block' : 'none';
+            document.getElementById('content-rtc').style.display = tab === 'rtc' ? 'block' : 'none';
+        }
+
+        function clearTranscript() {
+            fullTranscript = '';
+            document.getElementById('transcript-committed').innerText = '';
+            document.getElementById('transcript-delta').innerText = '';
+            document.getElementById('transcript-delta').style.display = 'none';
+            document.getElementById('transcript-placeholder').style.display = 'inline';
+        }
+
+        function copyTranscript() {
+            if (fullTranscript) {
+                navigator.clipboard.writeText(fullTranscript);
+                log('Transcript copied to clipboard', 'info');
+            }
+        }
+
+        // ── 3D Iridescent WebGL Voice Orb (from Phosai Mobile) ─────────────
+        const ORB_VERTEX_SHADER = `#version 300 es
+in vec2 a_position;
+out vec2 v_uv;
+void main() {
+  v_uv = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}
+`;
+
+        const ORB_FRAGMENT_SHADER = `#version 300 es
+precision highp float;
+
+in vec2 v_uv;
+out vec4 fragColor;
+
+uniform float u_time;
+uniform float u_speed;
+uniform float u_amplitude;
+uniform float u_glow;
+uniform float u_brightness;
+uniform float u_pulse;
+uniform float u_saturation;
+uniform vec3 u_color0;
+uniform vec3 u_color1;
+uniform vec3 u_color2;
+uniform float u_dpr;
+
+// Simplex-like noise (3D)
+vec3 mod289(vec3 x) { return x - floor(x / 289.0) * 289.0; }
+vec4 mod289(vec4 x) { return x - floor(x / 289.0) * 289.0; }
+vec4 permute(vec4 x) { return mod289((x * 34.0 + 1.0) * x); }
+vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+float snoise(vec3 v) {
+  const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+  vec3 i = floor(v + dot(v, vec3(C.y)));
+  vec3 x0 = v - i + dot(i, vec3(C.x));
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g, l.zxy);
+  vec3 i2 = max(g, l.zxy);
+  vec3 x1 = x0 - i1 + C.x;
+  vec3 x2 = x0 - i2 + C.y;
+  vec3 x3 = x0 - 0.5;
+  i = mod289(i);
+  vec4 p = permute(permute(permute(
+    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  vec4 j = p - 49.0 * floor(p / 49.0);
+  vec4 x_ = floor(j / 7.0);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = (x_ * 2.0 + 0.5) / 7.0 - 1.0;
+  vec4 y = (y_ * 2.0 + 0.5) / 7.0 - 1.0;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0) * 2.0 + 1.0;
+  vec4 s1 = floor(b1) * 2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+  vec3 g0 = vec3(a0.xy, h.x);
+  vec3 g1 = vec3(a0.zw, h.y);
+  vec3 g2 = vec3(a1.xy, h.z);
+  vec3 g3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(g0,g0), dot(g1,g1), dot(g2,g2), dot(g3,g3)));
+  g0 *= norm.x; g1 *= norm.y; g2 *= norm.z; g3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m * m, vec4(dot(g0,x0), dot(g1,x1), dot(g2,x2), dot(g3,x3)));
+}
+
+void main() {
+  vec2 uv = v_uv * 2.0 - 1.0;
+  float dist = length(uv);
+  float t = u_time * u_speed;
+
+  // Perfect circle — hard boundary, soft anti-aliased edge
+  float radius = 0.44;
+  float circle = 1.0 - smoothstep(radius - 0.008, radius + 0.008, dist);
+
+  if (circle < 0.001) {
+    // Outer glow only
+    float glowDist = max(0.0, dist - radius);
+    float glow = exp(-clamp(glowDist * 12.0, 0.0, 20.0)) * u_glow * 0.4;
+    vec3 glowColor = mix(u_color0, u_color1, 0.5);
+    fragColor = vec4(glowColor * glow, glow);
+    return;
+  }
+
+  float n1 = clamp(snoise(vec3(uv * 2.0, t * 0.6)) * 0.5 + 0.5, 0.0, 1.0);
+  float n2 = clamp(snoise(vec3(uv * 3.5 + 7.0, t * 0.9)) * 0.5 + 0.5, 0.0, 1.0);
+  float n3 = clamp(snoise(vec3(uv * 1.5 - 3.0, t * 0.4 + 10.0)) * 0.5 + 0.5, 0.0, 1.0);
+
+  vec2 distort = vec2(
+    snoise(vec3(uv * 2.0 + 5.0, t * 0.7)),
+    snoise(vec3(uv * 2.0 + 15.0, t * 0.7))
+  ) * u_amplitude * 2.0;
+  float n4 = clamp(snoise(vec3((uv + distort) * 3.0, t * 0.5)) * 0.5 + 0.5, 0.0, 1.0);
+
+  vec3 col = mix(u_color0, u_color1, n1);
+  col = mix(col, u_color2, n2 * 0.5);
+  col = mix(col, u_color1 * 1.3, n4 * 0.4);
+
+  // NaN protection: clamp n3 before pow
+  float vein = pow(clamp(n3, 0.0, 1.0), 3.0) * u_amplitude * 6.0;
+  col += vein * mix(u_color1, vec3(1.0), 0.3);
+
+  float centerDist = clamp(dist / radius, 0.0, 1.0);
+  float depthShade = 1.0 - centerDist * centerDist * 0.4;
+  col *= depthShade;
+
+  float rim = pow(centerDist, 4.0) * 0.6;
+  col += rim * mix(u_color0, vec3(1.0), 0.5);
+
+  vec2 lightPos = vec2(-0.15, -0.18);
+  float specDist = length(uv - lightPos);
+  float spec = exp(-clamp(specDist * specDist * 30.0, 0.0, 30.0)) * 0.7;
+  col += spec * vec3(1.0);
+
+  vec2 lightPos2 = vec2(0.2, 0.25);
+  float spec2 = exp(-clamp(length(uv - lightPos2) * 8.0, 0.0, 30.0)) * 0.15;
+  col += spec2 * u_color1;
+
+  float pulseFactor = 1.0 + u_pulse * sin(u_time * 3.5) * 0.35;
+
+  float lum = dot(col, vec3(0.299, 0.587, 0.114));
+  col = mix(vec3(lum), col, clamp(u_saturation, 0.0, 2.0));
+
+  col *= max(0.0, u_brightness * pulseFactor);
+
+  fragColor = vec4(clamp(col, 0.0, 1.0), circle);
+}
+`;
+
+        const ORB_STATE_CONFIGS = {
+            idle: { speed: 0.12, amplitude: 0.03, glow: 0.18, brightness: 0.65, pulse: 0, saturation: 0.65 },
+            connecting: { speed: 0.28, amplitude: 0.07, glow: 0.45, brightness: 0.8, pulse: 0.9, saturation: 0.85 },
+            listening: { speed: 0.22, amplitude: 0.07, glow: 0.45, brightness: 0.82, pulse: 0, saturation: 0.9 },
+            speaking: { speed: 0.68, amplitude: 0.32, glow: 0.95, brightness: 1.15, pulse: 0, saturation: 1.0 },
+            thinking: { speed: 0.42, amplitude: 0.16, glow: 0.65, brightness: 0.85, pulse: 0.6, saturation: 0.95 },
+            muted: { speed: 0.05, amplitude: 0.015, glow: 0.06, brightness: 0.32, pulse: 0, saturation: 0.15 },
+            error: { speed: 0.05, amplitude: 0.015, glow: 0.06, brightness: 0.32, pulse: 0, saturation: 0.15 }
+        };
+
+        const STATE_PALETTES = {
+            idle: [[0.15, 0.55, 1.0], [0.35, 0.75, 1.0], [0.1, 0.35, 0.85]],
+            connecting: [[0.2, 0.6, 1.0], [0.4, 0.8, 1.0], [0.1, 0.4, 0.9]],
+            listening: [[0.1, 0.45, 0.95], [0.25, 0.7, 1.0], [0.08, 0.3, 0.8]],
+            speaking: [[0.15, 0.65, 1.0], [0.45, 0.92, 1.0], [0.2, 0.42, 0.95]],
+            thinking: [[0.45, 0.25, 0.95], [0.7, 0.45, 1.0], [0.3, 0.15, 0.75]],
+            muted: [[0.35, 0.38, 0.42], [0.48, 0.5, 0.54], [0.25, 0.26, 0.3]],
+            error: [[0.8, 0.2, 0.2], [0.95, 0.4, 0.4], [0.5, 0.1, 0.1]]
+        };
+
+        const CAPTIONS = {
+            idle: "Ready",
+            connecting: "Connecting...",
+            listening: "Listening",
+            speaking: "Speaking Active",
+            thinking: "Transcribing...",
+            muted: "Microphone Off",
+            error: "Disconnected"
+        };
+
+        let currentOrbState = 'idle';
+        let currentOrbVolume = 0;
+        let orbCurrentParams = { ...ORB_STATE_CONFIGS.idle };
+        let orbTargetParams = { ...ORB_STATE_CONFIGS.idle };
+        let orbAccumulatedTime = 0;
+        let orbLastTime = performance.now();
+
+        function updateOrbState(state, vol = null) {
+            if (state && ORB_STATE_CONFIGS[state]) {
+                currentOrbState = state;
+                orbTargetParams = { ...ORB_STATE_CONFIGS[state] };
+                const captionElem = document.getElementById('orb-caption');
+                if (captionElem) {
+                    captionElem.innerText = CAPTIONS[state] || state;
+                }
+            }
+            if (typeof vol === 'number' && !isNaN(vol)) {
+                currentOrbVolume = vol;
+            }
+        }
+
+        function updateOrbVolume(vol) {
+            currentOrbVolume = vol;
+        }
+
+        function initVoiceOrb() {
+            const canvas = document.getElementById('aui-orb');
+            if (!canvas) return;
+
+            const gl = canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false, antialias: true }) ||
+                       canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false, antialias: true });
+            if (!gl) {
+                console.warn("WebGL not supported for Voice Orb");
+                return;
+            }
+
+            function createShader(type, src) {
+                const s = gl.createShader(type);
+                gl.shaderSource(s, src);
+                gl.compileShader(s);
+                return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+            }
+
+            const vs = createShader(gl.VERTEX_SHADER, ORB_VERTEX_SHADER);
+            const fs = createShader(gl.FRAGMENT_SHADER, ORB_FRAGMENT_SHADER);
+            if (!vs || !fs) return;
+
+            const prog = gl.createProgram();
+            gl.attachShader(prog, vs);
+            gl.attachShader(prog, fs);
+            gl.linkProgram(prog);
+            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+
+            gl.useProgram(prog);
+
+            const buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+
+            const aPos = gl.getAttribLocation(prog, "a_position");
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            const uniforms = {
+                u_time: gl.getUniformLocation(prog, "u_time"),
+                u_speed: gl.getUniformLocation(prog, "u_speed"),
+                u_amplitude: gl.getUniformLocation(prog, "u_amplitude"),
+                u_glow: gl.getUniformLocation(prog, "u_glow"),
+                u_brightness: gl.getUniformLocation(prog, "u_brightness"),
+                u_pulse: gl.getUniformLocation(prog, "u_pulse"),
+                u_saturation: gl.getUniformLocation(prog, "u_saturation"),
+                u_color0: gl.getUniformLocation(prog, "u_color0"),
+                u_color1: gl.getUniformLocation(prog, "u_color1"),
+                u_color2: gl.getUniformLocation(prog, "u_color2"),
+                u_dpr: gl.getUniformLocation(prog, "u_dpr")
+            };
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = 154 * dpr;
+            canvas.height = 154 * dpr;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // Click orb to connect / toggle microphone
+            canvas.addEventListener('click', () => {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    toggleWebSocket();
+                } else {
+                    toggleMicrophone();
+                }
+            });
+
+            function renderOrb() {
+                try {
+                    const now = performance.now();
+                    const dt = Math.min((now - orbLastTime) / 1000, 0.05);
+                    orbLastTime = now;
+
+                    const d = orbCurrentParams;
+                    const c = orbTargetParams;
+                    d.speed += (c.speed - d.speed) * 0.045;
+                    d.amplitude += (c.amplitude - d.amplitude) * 0.045;
+                    d.glow += (c.glow - d.glow) * 0.045;
+                    d.brightness += (c.brightness - d.brightness) * 0.045;
+                    d.pulse += (c.pulse - d.pulse) * 0.045;
+                    d.saturation += (c.saturation - d.saturation) * 0.045;
+
+                    const vol = currentOrbVolume;
+                    const effectiveSpeed = d.speed + (currentOrbState === 'speaking' ? 0.25 * vol : 0.08 * vol);
+                    orbAccumulatedTime += dt * effectiveSpeed;
+
+                    gl.clearColor(0, 0, 0, 0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+
+                    const palette = STATE_PALETTES[currentOrbState] || STATE_PALETTES.idle;
+                    const p0 = palette[0] || [0.15, 0.55, 1.0];
+                    const p1 = palette[1] || [0.35, 0.75, 1.0];
+                    const p2 = palette[2] || [0.1, 0.35, 0.85];
+
+                    const activeAmp = d.amplitude + (currentOrbState === 'speaking' ? 0.22 * vol : 0.06 * vol);
+                    const activeGlow = d.glow + 0.15 * vol;
+
+                    gl.uniform1f(uniforms.u_time, orbAccumulatedTime);
+                    gl.uniform1f(uniforms.u_speed, 1.0);
+                    gl.uniform1f(uniforms.u_amplitude, activeAmp);
+                    gl.uniform1f(uniforms.u_glow, activeGlow);
+                    gl.uniform1f(uniforms.u_brightness, d.brightness);
+                    gl.uniform1f(uniforms.u_pulse, d.pulse);
+                    gl.uniform1f(uniforms.u_saturation, d.saturation);
+
+                    gl.uniform3f(uniforms.u_color0, p0[0], p0[1], p0[2]);
+                    gl.uniform3f(uniforms.u_color1, p1[0], p1[1], p1[2]);
+                    gl.uniform3f(uniforms.u_color2, p2[0], p2[1], p2[2]);
+                    gl.uniform1f(uniforms.u_dpr, dpr);
+
+                    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                } catch (e) {
+                    console.error("Orb render error:", e);
+                }
+                requestAnimationFrame(renderOrb);
+            }
+            requestAnimationFrame(renderOrb);
+        }
+        initVoiceOrb();
+
+        // WebSocket Realtime Connection
+        function toggleWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            const base = serverUrlInput.value.trim().replace(/\/$/, '');
+            const wsProtocol = base.startsWith('https') ? 'wss' : 'ws';
+            const host = base.replace(/^https?:\/\//, '');
+            const model = encodeURIComponent(document.getElementById('model-select').value.trim());
+            const lang = encodeURIComponent(document.getElementById('lang-select').value.trim());
+            const apiKey = encodeURIComponent(document.getElementById('api-key').value.trim());
+
+            let wsUrl = `${wsProtocol}://${host}/v1/realtime?model=${model}&language=${lang}`;
+            if (apiKey) {
+                wsUrl += `&api_key=${apiKey}`;
+            }
+
+            log(`Connecting to: ${wsUrl}`, 'info');
+            setStatus('Connecting...', '');
+            updateOrbState('connecting');
+
+            try {
+                ws = new WebSocket(wsUrl);
+            } catch (e) {
+                log(`Connection error: ${e.message}`, 'err');
+                setStatus('Failed', '');
+                updateOrbState('error');
+                return;
+            }
+
+            ws.onopen = () => {
+                setStatus('Connected', 'connected');
+                updateOrbState('idle');
+                log('Connected to Voicebox Realtime WebSocket', 'out');
+                const btn = document.getElementById('btn-ws-connect');
+                btn.innerText = 'Disconnect';
+                btn.className = 'btn btn-danger';
+                document.getElementById('btn-mic').disabled = false;
+                document.getElementById('btn-commit').disabled = false;
+                document.getElementById('btn-clear').disabled = false;
+            };
+
+            ws.onclose = (e) => {
+                setStatus('Disconnected', '');
+                updateOrbState('idle', 0);
+                log(`WebSocket closed: code=${e.code} reason=${e.reason}`, 'info');
+                const btn = document.getElementById('btn-ws-connect');
+                btn.innerText = 'Connect';
+                btn.className = 'btn';
+                document.getElementById('btn-mic').disabled = true;
+                document.getElementById('btn-commit').disabled = true;
+                document.getElementById('btn-clear').disabled = true;
+                stopMicrophone();
+            };
+
+            ws.onerror = () => {
+                log('WebSocket Error encountered', 'err');
+                updateOrbState('error');
+            };
+
+            ws.onmessage = (event) => {
+                handleServerEvent(event.data);
+            };
+        }
+
+        function handleServerEvent(dataStr) {
+            try {
+                const event = JSON.parse(dataStr);
+                const type = event.type || 'unknown';
+
+                if (type === 'input_audio_buffer.speech_started' || type === 'recording_start') {
+                    document.getElementById('vad-state').innerText = 'Speech Active';
+                    document.getElementById('vad-badge').innerText = 'VAD: Speech';
+                    setStatus('Speech Active', 'speaking');
+                    updateOrbState('speaking');
+                    log(`speech_started (start_ms: ${event.audio_start_ms || 0})`, 'in');
+                } else if (type === 'input_audio_buffer.speech_stopped' || type === 'recording_stop') {
+                    document.getElementById('vad-state').innerText = 'Transcribing';
+                    document.getElementById('vad-badge').innerText = 'VAD: Transcribing';
+                    setStatus('Transcribing', 'connected');
+                    updateOrbState('thinking');
+                    log(`speech_stopped (end_ms: ${event.audio_end_ms || 0})`, 'in');
+                } else if (type === 'response.audio_transcript.delta' || type === 'conversation.item.input_audio_transcription.delta' || type === 'realtime') {
+                    const delta = event.delta || event.text || '';
+                    if (delta) {
+                        const deltaElem = document.getElementById('transcript-delta');
+                        deltaElem.style.display = 'inline';
+                        deltaElem.innerText = delta;
+                        log(`delta: "${delta}"`, 'in');
+                    }
+                } else if (type === 'response.audio_transcript.done' || type === 'conversation.item.input_audio_transcription.completed' || type === 'fullSentence' || type === 'transcription.completed') {
+                    const text = (event.transcript || event.text || '').trim();
+                    const deltaElem = document.getElementById('transcript-delta');
+                    deltaElem.innerText = '';
+                    deltaElem.style.display = 'none';
+
+                    if (text) {
+                        document.getElementById('transcript-placeholder').style.display = 'none';
+                        if (fullTranscript) fullTranscript += ' ';
+                        fullTranscript += text;
+                        document.getElementById('transcript-committed').innerText = fullTranscript;
+                    }
+
+                    document.getElementById('vad-state').innerText = 'Listening';
+                    document.getElementById('vad-badge').innerText = 'VAD: Listening';
+                    setStatus('Connected', 'connected');
+                    updateOrbState(isRecording ? 'listening' : 'idle', 0);
+                    log(`transcript.done: "${text}"`, 'in');
+                } else if (type === 'session.created' || type === 'transcription_session.created') {
+                    const lang = event.session?.input_audio_transcription?.language || 'en';
+                    log(`session.created: ${event.session?.id || 'ready'} (model: ${event.session?.model || 'default'}, language: ${lang})`, 'in');
+                    updateOrbState(isRecording ? 'listening' : 'idle');
+                } else if (type === 'session.updated' || type === 'transcription_session.updated') {
+                    const lang = event.session?.input_audio_transcription?.language || 'en';
+                    log(`session.updated: language updated to "${lang}"`, 'in');
+                } else if (type === 'error' || type === 'conversation.item.input_audio_transcription.failed') {
+                    log(`error: ${event.error?.message || 'Server error'}`, 'err');
+                    updateOrbState('error');
+                } else {
+                    log(`event: ${type}`, 'in');
+                }
+            } catch (e) {
+                log(`raw: ${dataStr}`, 'in');
+            }
+        }
+
+        // Live dynamic language switching over active WebSocket session
+        document.getElementById('lang-select').addEventListener('change', (e) => {
+            const newLang = e.target.value;
+            log(`Language dropdown changed to: ${newLang}`, 'info');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "session.update",
+                    session: {
+                        input_audio_transcription: {
+                            model: "phosai-stt-v1",
+                            language: newLang
+                        }
+                    }
+                }));
+                log(`Sent session.update -> language: ${newLang}`, 'out');
+            }
+        });
+
+        let pcmAccumulator = new Float32Array(0);
+        const FRAME_SIZE_SAMPLES = 1600; // 100ms chunks at 16kHz
+
+        // Resample native AudioContext buffer cleanly to 16,000 Hz
+        function resampleTo16k(inputBuffer, inRate) {
+            if (inRate === 16000) {
+                return inputBuffer;
+            }
+            if (inRate === 48000) {
+                // Exact 3:1 integer decimation with anti-aliasing 3-sample average
+                const outLen = Math.floor(inputBuffer.length / 3);
+                const out = new Float32Array(outLen);
+                for (let i = 0; i < outLen; i++) {
+                    const idx = i * 3;
+                    out[i] = (inputBuffer[idx] + inputBuffer[idx + 1] + inputBuffer[idx + 2]) / 3.0;
+                }
+                return out;
+            }
+            // General linear interpolation
+            const ratio = inRate / 16000;
+            const outLen = Math.floor(inputBuffer.length / ratio);
+            const out = new Float32Array(outLen);
+            for (let i = 0; i < outLen; i++) {
+                const srcPos = i * ratio;
+                const idx = Math.floor(srcPos);
+                const frac = srcPos - idx;
+                const s0 = inputBuffer[idx] || 0;
+                const s1 = (idx + 1 < inputBuffer.length) ? inputBuffer[idx + 1] : s0;
+                out[i] = s0 + frac * (s1 - s0);
+            }
+            return out;
+        }
+
+        // Microphone streaming (Cleaned up: noiseSuppression: true, natural 1.0x gain)
+        async function toggleMicrophone() {
+            if (isRecording) {
+                stopMicrophone();
+            } else {
+                startMicrophone();
+            }
+        }
+
+        async function startMicrophone() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,  // Enabled to filter background noise, fan hum, and room acoustics
+                        autoGainControl: true
+                    }
+                });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(mediaStream);
+
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                source.connect(analyser);
+
+                // Buffer size 4096
+                processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                // Mute gain node to prevent speaker acoustic feedback into microphone
+                const muteNode = audioContext.createGain();
+                muteNode.gain.value = 0;
+                source.connect(processor);
+                processor.connect(muteNode);
+                muteNode.connect(audioContext.destination);
+
+                document.getElementById('telemetry-rate').innerText = `${audioContext.sampleRate} Hz -> 16 kHz`;
+                pcmAccumulator = new Float32Array(0);
+
+                processor.onaudioprocess = (e) => {
+                    if (!isRecording || !ws || ws.readyState !== WebSocket.OPEN) return;
+                    const inputData = e.inputBuffer.getChannelData(0);
+
+                    // Compute dynamic amplitude for Voice Orb modulation
+                    let sum = 0;
+                    for (let i = 0; i < inputData.length; i++) {
+                        sum += inputData[i] * inputData[i];
+                    }
+                    const rms = Math.sqrt(sum / inputData.length);
+                    updateOrbVolume(Math.min(1.0, rms * 5.5));
+
+                    // Resample to exact 16,000 Hz
+                    const resampled = resampleTo16k(inputData, audioContext.sampleRate);
+
+                    // Accumulate samples into uniform 100ms frames
+                    const combined = new Float32Array(pcmAccumulator.length + resampled.length);
+                    combined.set(pcmAccumulator);
+                    combined.set(resampled, pcmAccumulator.length);
+                    pcmAccumulator = combined;
+
+                    // Dispatch exact 1600-sample chunks (100ms at 16kHz)
+                    while (pcmAccumulator.length >= FRAME_SIZE_SAMPLES) {
+                        const frame = pcmAccumulator.subarray(0, FRAME_SIZE_SAMPLES);
+                        pcmAccumulator = pcmAccumulator.subarray(FRAME_SIZE_SAMPLES);
+
+                        const pcm16 = new Int16Array(FRAME_SIZE_SAMPLES);
+                        for (let i = 0; i < FRAME_SIZE_SAMPLES; i++) {
+                            // Natural 1.0x gain to prevent boosting the ambient noise floor
+                            const s = Math.max(-1, Math.min(1, frame[i]));
+                            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        }
+
+                        // Base64 encode
+                        const binary = String.fromCharCode.apply(null, new Uint8Array(pcm16.buffer));
+                        const base64Audio = btoa(binary);
+
+                        ws.send(JSON.stringify({
+                            type: "input_audio_buffer.append",
+                            audio: base64Audio,
+                            sample_rate: 16000
+                        }));
+
+                        chunkCount++;
+                        document.getElementById('chunks-count').innerText = chunkCount;
+                    }
+                };
+
+                isRecording = true;
+                const micBtn = document.getElementById('btn-mic');
+                micBtn.innerText = 'Stop Microphone';
+                micBtn.className = 'btn btn-danger';
+                document.getElementById('vad-state').innerText = 'Listening';
+                document.getElementById('vad-badge').innerText = 'VAD: Listening';
+                updateOrbState('listening', 0);
+                log(`Microphone streaming active (${audioContext.sampleRate}Hz -> 16kHz PCM16, noise suppression ON)`, 'out');
+            } catch (err) {
+                alert(`Microphone access error: ${err.message}`);
+                log(`Microphone Error: ${err.message}`, 'err');
+                updateOrbState('error');
+            }
+        }
+
+        function stopMicrophone() {
+            if (!isRecording) return;
+            isRecording = false;
+            pcmAccumulator = new Float32Array(0);
+            updateOrbVolume(0);
+            if (processor) { processor.disconnect(); processor = null; }
+            if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+            if (audioContext) { audioContext.close(); audioContext = null; }
+            const micBtn = document.getElementById('btn-mic');
+            micBtn.innerText = 'Start Microphone';
+            micBtn.className = 'btn btn-secondary';
+            document.getElementById('vad-state').innerText = 'Inactive';
+            document.getElementById('vad-badge').innerText = 'VAD: Idle';
+            updateOrbState(ws && ws.readyState === WebSocket.OPEN ? 'idle' : 'idle', 0);
+            log('Microphone streaming stopped', 'info');
+        }
+
+        function commitBuffer() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
+                log('input_audio_buffer.commit sent', 'out');
+            }
+        }
+
+        function clearBuffer() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "input_audio_buffer.clear" }));
+                log('input_audio_buffer.clear sent', 'out');
+            }
+        }
+
+        // WebRTC Testing
+        async function testCreateSession() {
+            const base = serverUrlInput.value.trim().replace(/\/$/, '');
+            const model = document.getElementById('model-select').value.trim();
+            const logBox = document.getElementById('rtc-results');
+
+            try {
+                const res = await fetch(`${base}/v1/realtime/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: model,
+                        modalities: ["audio", "text"]
+                    })
+                });
+                const data = await res.json();
+                logBox.innerHTML += `<div class="log-entry"><span class="log-time">${new Date().toTimeString().split(' ')[0]}</span><span class="log-dir in">200 OK</span><span class="log-msg">${JSON.stringify(data, null, 2)}</span></div>`;
+                logBox.scrollTop = logBox.scrollHeight;
+            } catch (err) {
+                logBox.innerHTML += `<div class="log-entry"><span class="log-time">${new Date().toTimeString().split(' ')[0]}</span><span class="log-dir err">FAIL</span><span class="log-msg">${err.message}</span></div>`;
+            }
+        }
+
+        async function testSdpOffer() {
+            const base = serverUrlInput.value.trim().replace(/\/$/, '');
+            const logBox = document.getElementById('rtc-results');
+            const mockOffer = "v=0\r\no=- 123456 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111\r\nc=IN IP4 0.0.0.0\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=rtpmap:111 opus/48000/2\r\n";
+
+            try {
+                const res = await fetch(`${base}/v1/realtime`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/sdp' },
+                    body: mockOffer
+                });
+                const answer = await res.text();
+                logBox.innerHTML += `<div class="log-entry"><span class="log-time">${new Date().toTimeString().split(' ')[0]}</span><span class="log-dir in">201 CREATED</span><span class="log-msg">SDP Answer received (${answer.length} bytes)</span></div>`;
+                logBox.scrollTop = logBox.scrollHeight;
+            } catch (err) {
+                logBox.innerHTML += `<div class="log-entry"><span class="log-time">${new Date().toTimeString().split(' ')[0]}</span><span class="log-dir err">FAIL</span><span class="log-msg">${err.message}</span></div>`;
+            }
+        }
+    </script>
+</body>
+</html>
