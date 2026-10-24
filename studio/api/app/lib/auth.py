@@ -64,7 +64,7 @@ async def require_api_key(
 
     # Check for dynamic sk-phos- key
     if key.startswith(SecureAPIKeyEngine.PREFIX):
-        parts = key.rsplit("_", 1)
+        parts = key.split("_", 1)
         if len(parts) != 2:
             raise HTTPException(status_code=401, detail="Malformed API key")
 
