@@ -147,24 +147,16 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-simonallanachuka@gmail.com}
       AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
       STUDIO_SUPERADMIN_API_KEY: ${STUDIO_SUPERADMIN_API_KEY:-}
-      NODE_ENV: ${NODE_ENV:-production}
+      NODE_ENV: development
       WATCHPACK_POLLING: "true"
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     volumes:
-      - ./studio/web:/app
-      - /app/node_modules
-      - studio_web_next:/app/.next
-      - studio_web_pnpm_store:/root/.local/share/pnpm/store
+      - ./studio/web/src:/app/src
+      - ./studio/web/public:/app/public
     depends_on:
       - studio-api
-    command: >
-      sh -c "pnpm install --config.confirmModulesPurge=false &&
-             if [ \"$$NODE_ENV\" = \"development\" ]; then
-               pnpm dev -H 0.0.0.0;
-             else
-               pnpm build && pnpm start -H 0.0.0.0 -p 3000;
-             fi"
+    command: pnpm dev -H 0.0.0.0
 
   # Caddy automated reverse proxy
   caddy:

@@ -7,9 +7,9 @@ import {
   Copy01Icon,
   CheckmarkCircle02Icon,
   Delete02Icon,
-  AlertCircleIcon,
-  PlusSignIcon,
-  ShieldSecurityIcon,
+  Alert01Icon,
+  Add01Icon,
+  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
 import { api, type APIKeyItem, type CreateAPIKeyResponse } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -130,14 +130,14 @@ export function ApiKeysPanel() {
           onClick={() => setCreateModalOpen(true)}
           className="h-8 px-4 text-xs font-medium gap-1.5 shrink-0"
         >
-          <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
+          <HugeiconsIcon icon={Add01Icon} className="size-3.5" />
           Create New Key
         </Button>
       </div>
 
       {error && (
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-destructive/5 border border-destructive/10 text-destructive text-sm">
-          <HugeiconsIcon icon={AlertCircleIcon} className="size-4 shrink-0" />
+          <HugeiconsIcon icon={Alert01Icon} className="size-4 shrink-0" />
           {error}
         </div>
       )}
@@ -152,7 +152,7 @@ export function ApiKeysPanel() {
         ) : keys.length === 0 ? (
           <div className="p-12 text-center">
             <div className="mx-auto size-12 rounded-full bg-primary/5 flex items-center justify-center text-primary mb-3">
-              <HugeiconsIcon icon={ShieldSecurityIcon} className="size-6" />
+              <HugeiconsIcon icon={ShieldKeyIcon} className="size-6" />
             </div>
             <h4 className="text-sm font-medium text-foreground">No API keys yet</h4>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
@@ -163,7 +163,7 @@ export function ApiKeysPanel() {
               variant="outline"
               className="h-8 px-4 text-xs font-medium gap-1.5 mt-4"
             >
-              <HugeiconsIcon icon={PlusSignIcon} className="size-3.5" />
+              <HugeiconsIcon icon={Add01Icon} className="size-3.5" />
               Create your first API key
             </Button>
           </div>
@@ -319,7 +319,7 @@ export function ApiKeysPanel() {
 
             <div className="p-3 rounded-lg bg-warning/5 border border-warning/15 text-warning text-xs space-y-1">
               <p className="font-semibold flex items-center gap-1.5">
-                <HugeiconsIcon icon={AlertCircleIcon} className="size-3.5 shrink-0" />
+                <HugeiconsIcon icon={Alert01Icon} className="size-3.5 shrink-0" />
                 Security Notice
               </p>
               <p className="text-muted-foreground text-[11px] leading-relaxed">
