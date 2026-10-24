@@ -152,12 +152,15 @@ const PROVIDER_HELP: Record<string, { models: string[]; docs: string; placeholde
   },
 };
 
+import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
+
 const DEFAULT_VOICE_SERVER_URL = "http://127.0.0.1:8300";
 
 const SETTINGS_TABS = [
   { id: "ai-models", label: "AI Models" },
   { id: "voice-infrastructure", label: "Voice Infrastructure" },
   { id: "observability", label: "Observability" },
+  { id: "api-keys", label: "API Keys" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_TABS)[number]["id"];
@@ -636,6 +639,9 @@ const STT_WS_PROVIDERS = new Set([
   "phosai-stt", // STT — PhosAI Real-Time WebSocket ASR
   "phosai-realtime",
   "phosai",
+  "nemotron", // STT — NVIDIA Nemotron 3.5 Streaming WS ASR
+  "canary-ws",
+  "etoil-stt",
 ]);
 
 function getProviderCategory(value: string, type: "stt" | "tts"): "self-hosted" | "ws" | "http" {
@@ -2034,6 +2040,13 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
               ) : null}
             </div>
           </section>
+        </div>
+      )}
+
+      {/* ═══ SECTION 4: Developer API Keys ═══ */}
+      {activeTab === "api-keys" && (
+        <div className="pt-2">
+          <ApiKeysPanel />
         </div>
       )}
 

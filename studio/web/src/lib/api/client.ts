@@ -1089,7 +1089,38 @@ export const api = {
       }),
     delete: (id: string) => apiFetch<void>(`/phone-numbers/${id}`, { method: "DELETE" }),
   },
+
+  // API Keys
+  apiKeys: {
+    list: () => apiFetch<APIKeyItem[]>("/api-keys"),
+    create: (data: { name: string; scopes?: string[] }) =>
+      apiFetch<CreateAPIKeyResponse>("/api-keys", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    revoke: (id: string) =>
+      apiFetch<{ status: string; id: string }>(`/api-keys/${id}`, {
+        method: "DELETE",
+      }),
+  },
 };
+
+// ── API Key Types ───────────────────────────────────────────────
+
+export interface APIKeyItem {
+  id: string;
+  name: string;
+  masked_key: string;
+  scopes: string[];
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface CreateAPIKeyResponse extends APIKeyItem {
+  raw_key: string;
+  warning: string;
+}
 
 // ── Settings Types ──────────────────────────────────────────────
 

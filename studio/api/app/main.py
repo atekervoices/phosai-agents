@@ -15,11 +15,13 @@ from loguru import logger
 
 from app.api.admin import router as admin_router
 from app.api.agents import router as agents_router
+from app.api.api_keys import router as api_keys_router
 from app.api.builder import router as builder_router
 from app.api.calls import router as calls_router
 from app.api.credentials import router as credentials_router
 from app.api.evaluations import router as evaluations_router
 from app.api.integrations import router as integrations_router
+from app.api.knowledge import router as knowledge_router
 from app.api.oauth import router as oauth_router
 from app.api.oauth_apps import router as oauth_apps_router
 from app.api.phone_numbers import router as phone_numbers_router
@@ -67,6 +69,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # port 8300. Python no longer starts or stops the embedded Rust server.
 
     logger.info("Voice Agent OS starting in {} mode", settings.environment)
+    
+    # Pre-warm FastEmbed neural model in background for instantaneous voice query lookups
+    try:
+        import asyncio
+        from app.services.knowledge_service import warm_embedding_model
+        asyncio.create_task(asyncio.to_thread(warm_embedding_model))
+    except Exception as e:
+        logger.warning(f"Could not trigger FastEmbed warm-up: {e}")
+
     yield
 
     logger.info("Voice Agent OS shutting down")
@@ -100,6 +111,8 @@ _auth = [Depends(require_api_key)]
 
 app.include_router(admin_router, prefix="/api")
 app.include_router(agents_router, prefix="/api", dependencies=_auth)
+app.include_router(api_keys_router, prefix="/api", dependencies=_auth)
+app.include_router(api_keys_router, prefix="/v1", dependencies=_auth)
 app.include_router(builder_router, prefix="/api", dependencies=_auth)
 app.include_router(calls_router, prefix="/api", dependencies=_auth)
 app.include_router(credentials_router, prefix="/api", dependencies=_auth)
@@ -111,6 +124,7 @@ app.include_router(phone_numbers_router, prefix="/api", dependencies=_auth)
 # (browser popup redirect from OAuth provider has no API key header)
 app.include_router(oauth_router, prefix="/api")
 app.include_router(oauth_apps_router, prefix="/api", dependencies=_auth)
+app.include_router(knowledge_router, prefix="/api")
 
 # ── WebSocket routes (auth handled inside the handler via query params,
 #    because browsers cannot send custom HTTP headers on WS upgrades) ──

@@ -1,9 +1,64 @@
 {
     admin off
-    auto_https off
 }
 
-# Unified single-domain gateway for agents.phosaico.com
+# ==============================================================================
+# 1. Developer Documentation Portal
+# ==============================================================================
+docs.atekervoices.com {
+    reverse_proxy phosai-docs:7970
+}
+
+# ==============================================================================
+# 2. Unified Speech & AI Public API Gateway
+# ==============================================================================
+api.atekervoices.com {
+    # Real-Time STT WebSocket & Batch Transcription -> Remote STT Cluster
+    @stt path /v1/realtime* /v1/audio/transcriptions*
+    handle @stt {
+        reverse_proxy https://stt-staging.atekervoices.com {
+            header_up Host stt-staging.atekervoices.com
+            transport http {
+                tls
+                tls_server_name stt-staging.atekervoices.com
+            }
+        }
+    }
+
+    # Text-to-Speech Engine -> Remote TTS Cluster
+    @tts path /v1/speech* /v1/audio/speech*
+    handle @tts {
+        reverse_proxy https://tts.atekervoices.com {
+            header_up Host tts.atekervoices.com
+            transport http {
+                tls
+                tls_server_name tts.atekervoices.com
+            }
+        }
+    }
+
+    # Neural Translation -> Remote Translation Cluster
+    @translate path /v1/translate*
+    handle @translate {
+        reverse_proxy https://translate.atekervoices.com {
+            header_up Host translate.atekervoices.com
+            transport http {
+                tls
+                tls_server_name translate.atekervoices.com
+            }
+        }
+    }
+
+    # API Key Management & Control Plane -> Local FastAPI
+    @control_plane path /v1/api-keys* /api/*
+    handle @control_plane {
+        reverse_proxy studio-api:8000
+    }
+}
+
+# ==============================================================================
+# 3. Studio Web Dashboard & Voice Agent OS
+# ==============================================================================
 http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
     # 1. Rust Voice Server: WebSockets, WebRTC signaling & session endpoints
     @voice path /ws/* /voice/* /rtc/* /telephony/*
@@ -12,7 +67,7 @@ http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
     }
 
     # 2. FastAPI Backend API
-    @api path /api/*
+    @api path /api/* /v1/*
     handle @api {
         reverse_proxy studio-api:8000
     }

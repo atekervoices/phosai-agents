@@ -17,7 +17,27 @@ async def update_schema():
             await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS organization_id VARCHAR(255);"))
             await conn.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_organization_id ON {table} (organization_id);"))
             
-    print("Multi-tenant schema updates applied successfully!")
+        # Create api_keys table if not exists
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id UUID PRIMARY KEY,
+                organization_id VARCHAR(255) NOT NULL,
+                user_id VARCHAR(255),
+                name VARCHAR(100) NOT NULL,
+                key_prefix VARCHAR(32) NOT NULL,
+                hashed_key VARCHAR(64) NOT NULL,
+                masked_key VARCHAR(40) NOT NULL,
+                scopes JSONB DEFAULT '[]'::jsonb NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+                last_used_at TIMESTAMPTZ
+            );
+            CREATE INDEX IF NOT EXISTS ix_api_keys_organization_id ON api_keys (organization_id);
+            CREATE INDEX IF NOT EXISTS ix_api_keys_key_prefix ON api_keys (key_prefix);
+            CREATE INDEX IF NOT EXISTS ix_api_keys_user_id ON api_keys (user_id);
+        """))
+
+    print("Multi-tenant and API Key schema updates applied successfully!")
 
 if __name__ == "__main__":
     asyncio.run(update_schema())

@@ -15,13 +15,17 @@ strings differ, eliminating that signal.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import hmac
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import APIKeyHeader
+from sqlalchemy import select
 
 from app.lib import get_settings
+from app.lib.database import async_session
+from app.models.api_key import APIKey, SecureAPIKeyEngine
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 _superadmin_key_header = APIKeyHeader(name="X-SuperAdmin-Key", auto_error=False)
@@ -31,29 +35,80 @@ async def require_api_key(
     request: Request,
     key: str | None = Security(_api_key_header),
 ) -> str:
-    """Validate the API key from the request header.
+    """Validate the API key from the request header (X-API-Key or Authorization Bearer).
 
-    Uses a constant-time comparison (``hmac.compare_digest``) to
-    prevent timing-oracle attacks.
+    Supports:
+      1. Dynamic sk-phos- customer keys verified via SHA-256 and constant-time check.
+      2. Environment-configured static admin API keys.
 
     Raises:
         HTTPException 401 if the key is missing or invalid.
     """
     settings = get_settings()
 
+    # Fallback to Authorization: Bearer <key> header if X-API-Key is not set
+    if not key:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            key = auth_header.split(" ", 1)[1].strip()
+
     # Skip auth in development when no key is configured
-    # Check for Clerk JWT first, even in development
-    if settings.is_development and settings.auth.api_key == "":
+    if settings.is_development and settings.auth.api_key == "" and not key:
         return "dev-no-key"
 
     if not key:
-        raise HTTPException(status_code=401, detail="Missing API key")
+        raise HTTPException(
+            status_code=401,
+            detail="Missing API key. Provide via 'X-API-Key' or 'Authorization: Bearer sk-phos-...'",
+        )
 
-    # Constant-time comparison — prevents timing-oracle attacks
-    if not hmac.compare_digest(key, settings.auth.api_key):
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    # Check for dynamic sk-phos- key
+    if key.startswith(SecureAPIKeyEngine.PREFIX):
+        parts = key.rsplit("_", 1)
+        if len(parts) != 2:
+            raise HTTPException(status_code=401, detail="Malformed API key")
 
-    return key
+        prefix = parts[0]  # e.g., "sk-phos-a1b2c3d4"
+
+        async with async_session() as session:
+            query = select(APIKey).where(
+                APIKey.key_prefix == prefix,
+                APIKey.is_active == True,
+            )
+            result = await session.execute(query)
+            candidates = result.scalars().all()
+
+            matching_key: APIKey | None = None
+            for record in candidates:
+                if SecureAPIKeyEngine.verify(key, record.hashed_key):
+                    matching_key = record
+                    break
+
+            if not matching_key:
+                raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+
+            # Update last_used_at timestamp
+            try:
+                matching_key.last_used_at = datetime.now(timezone.utc)
+                await session.commit()
+            except Exception:
+                pass
+
+            # Inject tenant context into request.state
+            request.state.tenant = TenantContext(
+                user_id=matching_key.user_id,
+                organization_id=matching_key.organization_id,
+                role="api_client",
+            )
+            request.state.api_key = matching_key
+
+            return key
+
+    # Constant-time comparison for static system API key
+    if settings.auth.api_key and hmac.compare_digest(key, settings.auth.api_key):
+        return key
+
+    raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 async def require_super_admin(
@@ -95,18 +150,30 @@ async def require_tenant(
 ) -> TenantContext:
     """Extract authenticated user and organization tenant context.
 
-    Parses X-User-Id and X-Organization-Id headers forwarded by Next.js Clerk middleware.
+    Parses:
+      1. X-User-Id and X-Organization-Id headers forwarded by Next.js proxy middleware.
+      2. Authenticated API key tenant context on request.state (for sk-phos- callers).
     """
     user_id = request.headers.get("X-User-Id")
     org_id = request.headers.get("X-Organization-Id")
     role_header = request.headers.get("X-Role", "").strip().lower()
 
-    is_admin = role_header == "admin"
+    if org_id or user_id:
+        is_admin = role_header == "admin"
+        return TenantContext(
+            user_id=user_id,
+            organization_id=org_id,
+            role="admin" if is_admin else "member",
+        )
+
+    # If caller authenticated via an sk-phos- API key
+    if hasattr(request.state, "tenant") and request.state.tenant:
+        return request.state.tenant
 
     return TenantContext(
-        user_id=user_id,
-        organization_id=org_id,
-        role="admin" if is_admin else "member",
+        user_id="default-user",
+        organization_id="default",
+        role="member",
     )
 
 
