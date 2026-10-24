@@ -27,6 +27,9 @@ const STATE_CAPTIONS: Record<VoiceOrbState, string> = {
   thinking: "Thinking...",
   speaking: "Speaking",
   muted: "Microphone muted",
+  processing: "Processing...",
+  toolcalling: "Working...",
+  error: "Error",
 };
 
 export function VoiceIndicator({

@@ -1276,7 +1276,24 @@ pub const STT_MODEL_CATALOG: &[SttModelSpec] = &[
             "lug", "ach", "teo", "sw", "swa", "kin", "lgg", "nyn", "xog", "ttj", "myx", "en",
         ],
     },
-
+    SttModelSpec {
+        provider: "nemotron",
+        model_id: "phosai-streaming-voice-v1",
+        label: "PhosAI Streaming Voice v1 (Nemotron 3.5)",
+        supported_languages: &[
+            "en", "en-gb", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "hi", "ar",
+            "tr", "vi", "sw", "auto",
+        ],
+    },
+    SttModelSpec {
+        provider: "canary-ws",
+        model_id: "phosai-streaming-voice-v1",
+        label: "PhosAI Streaming Voice v1 (Canary WS)",
+        supported_languages: &[
+            "en", "en-gb", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "hi", "ar",
+            "tr", "vi", "sw", "auto",
+        ],
+    },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

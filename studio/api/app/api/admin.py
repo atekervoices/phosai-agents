@@ -84,8 +84,7 @@ async def get_admin_users(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Get dynamic user tenant list by combining Clerk Directory API and Database Agent Quotas."""
-    clerk_secret = (request.headers.get("X-Clerk-Secret-Key") or os.getenv("CLERK_SECRET_KEY", "")).strip()
+    """Get dynamic user tenant list by querying Firebase Auth and Database Agent Quotas."""
     admin_email = os.getenv("ADMIN_EMAIL", "simonallanachuka@gmail.com").strip().lower()
 
     # Query agent counts grouped by user_id from Postgres
@@ -98,55 +97,56 @@ async def get_admin_users(
 
     users: list[dict[str, Any]] = []
 
-    # Fetch users from Clerk if secret is set
-    if clerk_secret:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    "https://api.clerk.com/v1/users?limit=100",
-                    headers={"Authorization": f"Bearer {clerk_secret}"},
-                )
-                if resp.status_code == 200:
-                    clerk_users = resp.json()
-                    for u in clerk_users:
-                        u_id = u.get("id")
-                        primary_email_id = u.get("primary_email_address_id")
-                        emails = u.get("email_addresses", [])
-                        email_str = ""
-                        for em in emails:
-                            if em.get("id") == primary_email_id or not email_str:
-                                email_str = em.get("email_address", "")
+    # Fetch users from Firebase Admin if available
+    try:
+        import firebase_admin
+        from firebase_admin import auth as fb_auth
 
-                        public_meta = u.get("public_metadata", {}) or {}
-                        role_meta = str(public_meta.get("role", "")).lower()
-                        is_admin = role_meta == "admin" or (email_str and email_str.lower() == admin_email)
+        if not firebase_admin._apps:
+            cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+            if cred_path and os.path.exists(cred_path):
+                cred = firebase_admin.credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+            else:
+                project_id = os.getenv("FIREBASE_PROJECT_ID") or os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID")
+                if project_id:
+                    firebase_admin.initialize_app(options={"projectId": project_id})
+                else:
+                    firebase_admin.initialize_app()
 
-                        agents_cnt = agent_counts_map.get(u_id, 0)
-                        created_ts = u.get("created_at")
-                        created_str = (
-                            datetime.datetime.fromtimestamp(created_ts / 1000, tz=datetime.UTC).isoformat()
-                            if created_ts else "2026-01-01T00:00:00Z"
-                        )
+        page = fb_auth.list_users(max_results=100)
+        for u in page.users:
+            u_id = u.uid
+            email_str = u.email or ""
+            custom_claims = u.custom_claims or {}
+            role_meta = str(custom_claims.get("role", "")).lower()
+            is_admin = (
+                role_meta == "admin"
+                or bool(custom_claims.get("admin"))
+                or (email_str and email_str.lower() == admin_email)
+            )
+            agents_cnt = agent_counts_map.get(u_id, 0)
+            created_ts = u.user_metadata.creation_timestamp
+            created_str = (
+                datetime.datetime.fromtimestamp(created_ts / 1000, tz=datetime.UTC).isoformat()
+                if created_ts else "2026-01-01T00:00:00Z"
+            )
 
-                        first_name = u.get("first_name") or ""
-                        last_name = u.get("last_name") or ""
-                        full_name = f"{first_name} {last_name}".strip()
+            users.append({
+                "id": u_id,
+                "email": email_str or u_id,
+                "name": u.display_name or email_str or u_id,
+                "image_url": u.photo_url or "",
+                "role": "Super Admin" if is_admin else "Tenant User",
+                "agents_count": agents_cnt,
+                "call_minutes": round(agents_cnt * 2.4, 1),
+                "status": "DISABLED" if u.disabled else "ACTIVE",
+                "created_at": created_str,
+            })
+    except Exception:
+        pass
 
-                        users.append({
-                            "id": u_id,
-                            "email": email_str or u_id,
-                            "name": full_name or email_str or u_id,
-                            "image_url": u.get("image_url") or "",
-                            "role": "Super Admin" if is_admin else "Tenant User",
-                            "agents_count": agents_cnt,
-                            "call_minutes": round(agents_cnt * 2.4, 1),
-                            "status": "BANNED" if u.get("banned") else "ACTIVE",
-                            "created_at": created_str,
-                        })
-        except Exception:
-            pass
-
-    # Fallback if no Clerk users returned or Clerk is disabled
+    # Fallback if no Firebase users returned or Firebase Admin is unconfigured
     if not users:
         users.append({
             "id": "admin-phosai-001",
@@ -177,6 +177,32 @@ async def get_admin_users(
         "total": len(users),
         "users": users,
     }
+
+
+@router.post("/users/{uid}/role")
+async def set_user_role(
+    uid: str,
+    payload: dict[str, str],
+) -> dict[str, Any]:
+    """Set custom role claim (e.g. admin or user) on a Firebase user."""
+    target_role = payload.get("role", "user").lower()
+    is_admin = target_role == "admin"
+    try:
+        from firebase_admin import auth as fb_auth
+        fb_auth.set_custom_user_claims(uid, {"role": target_role, "admin": is_admin})
+        return {
+            "status": "success",
+            "uid": uid,
+            "role": target_role,
+            "admin": is_admin,
+            "message": f"Successfully updated user role to {target_role}."
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "uid": uid,
+            "message": f"Failed to set custom claim: {str(e)}"
+        }
 
 
 @router.get("/telephony")
@@ -245,6 +271,14 @@ async def get_admin_providers() -> dict[str, Any]:
                 "status": "CONFIGURED" if has_stt else "READY",
                 "is_default": True,
                 "latency_p50": "110ms",
+            },
+            {
+                "id": "nemotron",
+                "name": "NVIDIA Nemotron 3.5 Streaming ASR",
+                "category": "STT",
+                "status": "READY",
+                "is_default": False,
+                "latency_p50": "130ms",
             },
             {
                 "id": "phosai-tts",

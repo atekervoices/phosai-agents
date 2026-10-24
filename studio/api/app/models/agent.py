@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.credential import Credential
     from app.models.evaluation import EvaluationConfig, EvaluationRun
     from app.models.phone_number import PhoneNumber
+    from app.models.knowledge import KnowledgeBase
 
 
 class AgentStatus(StrEnum):
@@ -100,6 +101,11 @@ class Agent(Base):
         "PhoneNumber",
         back_populates="agent",
         passive_deletes=True,  # FK is SET NULL on delete, no Python cascade needed
+    )
+    knowledge_bases: Mapped[list[KnowledgeBase]] = relationship(
+        "KnowledgeBase",
+        back_populates="agent",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

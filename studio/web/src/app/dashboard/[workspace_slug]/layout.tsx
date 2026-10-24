@@ -15,8 +15,8 @@ import {
   Cancel01Icon,
 } from "@hugeicons/core-free-icons";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
-import { UserButton, useUser, useClerk } from "@clerk/nextjs";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { FerosLogoWordmark } from "@/components/logo";
 
 const navItems = [
@@ -34,48 +34,62 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const params = useParams();
   const workspaceSlug = (params?.workspace_slug as string) || "default";
-  const { user } = useUser();
-  const clerk = useClerk();
+  const { user, isAdmin, signOut, loading } = useAuth();
 
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Strict route protection: either you have an account and are signed in, or redirect to sign-in
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/sign-in");
+    }
+  }, [user, loading, router]);
 
   // Auto-close mobile drawer when route changes
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
-  const adminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || "simonallanachuka@gmail.com").toLowerCase();
-  const isAdmin = !isClerkEnabled || (user as any)?.publicMetadata?.role === "admin" || (Boolean(userEmail) && userEmail.toLowerCase() === adminEmail);
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } catch (err) {
+      console.error("Sign-out error:", err);
+    } finally {
+      window.location.href = "/sign-in";
+    }
+  };
+
+  // Prevent flashing unauthenticated content while checking auth
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-xs text-muted-foreground font-mono">Loading workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const userEmail = user.email || "";
+  const displayName = user.displayName || (userEmail ? userEmail.split("@")[0] : "Account");
+  const avatarLetter = (displayName[0] || userEmail[0] || "U").toUpperCase();
 
   const getNavHref = (path: string) => {
     if (path.startsWith("/admin")) return path;
     return workspaceSlug ? `/dashboard/${workspaceSlug}${path}` : `/dashboard${path}`;
-  };
-
-  const handleOpenAccount = () => {
-    if (isClerkEnabled && clerk?.openUserProfile) {
-      clerk.openUserProfile();
-    }
-  };
-
-  const handleSignOut = () => {
-    try {
-      if (isClerkEnabled && clerk?.signOut) {
-        clerk.signOut({ redirectUrl: "/sign-in" });
-      }
-    } catch {
-      /* ignore */
-    }
-    window.location.href = "/sign-in";
   };
 
   const renderNavContent = () => (
@@ -131,35 +145,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Profile & Logout Footer */}
       <div className="p-3 border-t border-sidebar-border mt-auto">
-        <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-sidebar-muted/60 border border-sidebar-border/40 hover:bg-sidebar-muted transition-colors">
-          <div
-            onClick={handleOpenAccount}
-            className="flex items-center gap-2 min-w-0 cursor-pointer group flex-1"
-            title="Click to Manage Account"
-          >
-            {mounted && isClerkEnabled ? (
-              <UserButton
-                appearance={{
-                  elements: {
-                    userButtonAvatarBox: "size-7 border border-border/80 shadow-xs shrink-0",
-                  },
-                }}
+        <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-sidebar-muted/40 border border-sidebar-border/60 hover:bg-sidebar-muted/80 transition-all">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={displayName}
+                className="size-8 rounded-full border border-border/80 shadow-xs shrink-0 object-cover"
               />
             ) : (
-              <div className="size-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-extrabold text-xs shrink-0 group-hover:ring-2 group-hover:ring-primary/40 transition-all">
-                {userEmail ? userEmail[0].toUpperCase() : "P"}
+              <div className="size-8 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                {avatarLetter}
               </div>
             )}
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-sidebar-foreground group-hover:text-primary transition-colors truncate max-w-[95px]">
-                {mounted && (user?.fullName || user?.firstName)
-                  ? user.fullName || user.firstName
-                  : userEmail
-                  ? userEmail.split("@")[0]
-                  : "PhosAI User"}
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-xs font-semibold text-sidebar-foreground truncate" title={displayName}>
+                {displayName}
               </span>
-              <span className="text-[10px] text-sidebar-muted-foreground font-mono truncate max-w-[95px]">
-                {userEmail || "Local Admin"}
+              <span className="text-[10px] text-muted-foreground font-mono truncate" title={userEmail}>
+                {userEmail}
               </span>
             </div>
           </div>
@@ -170,13 +174,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               e.stopPropagation();
               handleSignOut();
             }}
-            title="Sign Out"
-            className="p-1.5 rounded-lg text-sidebar-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+            disabled={isSigningOut}
+            title="Log Out"
+            aria-label="Log Out"
+            className="size-8 flex items-center justify-center rounded-lg text-sidebar-muted-foreground hover:text-destructive hover:bg-destructive/15 active:scale-95 transition-all shrink-0 cursor-pointer disabled:opacity-50"
           >
-            <HugeiconsIcon icon={Logout01Icon} className="size-4" />
+            {isSigningOut ? (
+              <div className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <HugeiconsIcon icon={Logout01Icon} className="size-4" />
+            )}
           </button>
         </div>
       </div>
+
     </>
   );
 
@@ -212,15 +223,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </span>
             </Link>
           )}
-          {mounted && isClerkEnabled ? (
-            <UserButton
-              appearance={{
-                elements: {
-                  userButtonAvatarBox: "size-7 border border-border/80 shadow-xs shrink-0",
-                },
-              }}
+          {user.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt={displayName}
+              className="size-7 rounded-full border border-border/80 shadow-xs shrink-0 object-cover"
             />
-          ) : null}
+          ) : (
+            <div className="size-7 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center justify-center font-bold text-xs shrink-0">
+              {avatarLetter}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            title="Log Out"
+            aria-label="Log Out"
+            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {isSigningOut ? (
+              <div className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <HugeiconsIcon icon={Logout01Icon} className="size-4" />
+            )}
+          </button>
         </div>
       </header>
 

@@ -1,23 +1,23 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DashboardCircleIcon,
-  ChartHistogramIcon,
-  VoiceIcon,
-  ArrowLeft01Icon,
-  UserGroupIcon,
-  SmartPhoneIcon,
   Robot01Icon,
+  VoiceIcon,
+  SmartPhoneIcon,
+  UserGroupIcon,
+  ChartHistogramIcon,
+  ArrowLeft01Icon,
   ConnectIcon,
   Logout01Icon,
   PanelLeftIcon,
   Cancel01Icon,
 } from "@hugeicons/core-free-icons";
-import { UserButton, useUser, useClerk } from "@clerk/nextjs";
+import { useAuth } from "@/contexts/auth-context";
 import { FerosLogoWordmark } from "@/components/logo";
 
 interface NavItem {
@@ -55,29 +55,51 @@ const adminNavSections: NavSection[] = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const clerk = useClerk();
-  const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-  const { user, isLoaded } = useUser();
+  const { user, isAdmin, loading, signOut, isFirebaseConfigured } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Auto-close mobile drawer when navigating
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
-  const adminEmail = (process.env.ADMIN_EMAIL || process.env.NEXT_PUBLIC_ADMIN_EMAIL || "simonallanachuka@gmail.com").toLowerCase();
-  const isAdmin = !isClerkEnabled || (user as any)?.publicMetadata?.role === "admin" || (Boolean(userEmail) && userEmail.toLowerCase() === adminEmail);
-
   useEffect(() => {
-    if (isLoaded && isClerkEnabled && !isAdmin) {
-      router.replace("/dashboard");
+    if (!loading) {
+      if (!user) {
+        router.replace("/sign-in");
+      } else if (isFirebaseConfigured && !isAdmin) {
+        router.replace("/dashboard");
+      }
     }
-  }, [isLoaded, isClerkEnabled, isAdmin, router]);
+  }, [loading, user, isFirebaseConfigured, isAdmin, router]);
 
-  if (isClerkEnabled && isLoaded && !isAdmin) {
-    return null;
+  if (loading || !user || (isFirebaseConfigured && !isAdmin)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-xs text-muted-foreground font-mono">Authenticating admin...</span>
+        </div>
+      </div>
+    );
   }
+
+  const userEmail = user.email || "";
+  const displayName = user.displayName || (userEmail ? userEmail.split("@")[0] : "Admin");
+  const avatarLetter = (displayName[0] || userEmail[0] || "A").toUpperCase();
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } catch (err) {
+      console.error("Sign-out error:", err);
+    } finally {
+      window.location.href = "/sign-in";
+    }
+  };
 
   const renderNavContent = () => (
     <>
@@ -130,50 +152,49 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Footer */}
       <div className="p-3 border-t border-sidebar-border space-y-2 mt-auto">
-        {isClerkEnabled && (
-          <div className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-sidebar-muted/60 border border-sidebar-border/40">
-            <div
-              onClick={() => {
-                if (clerk?.openUserProfile) clerk.openUserProfile();
-              }}
-              className="flex items-center gap-2 min-w-0 cursor-pointer group flex-1"
-              title="Manage Admin Profile"
-            >
-              <UserButton
-                appearance={{
-                  elements: {
-                    userButtonAvatarBox: "size-7 border border-border/80 shadow-xs shrink-0",
-                  },
-                }}
+        <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-sidebar-muted/40 border border-sidebar-border/60 hover:bg-sidebar-muted/80 transition-all">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={displayName}
+                className="size-8 rounded-full border border-border/80 shadow-xs shrink-0 object-cover"
               />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-semibold text-sidebar-foreground group-hover:text-primary transition-colors truncate max-w-[95px]">
-                  {user?.fullName || user?.firstName || userEmail.split("@")[0] || "Admin"}
-                </span>
-                <span className="text-[10px] text-sidebar-muted-foreground font-mono truncate max-w-[95px]">
-                  {userEmail || "System Admin"}
-                </span>
+            ) : (
+              <div className="size-8 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                {avatarLetter}
               </div>
+            )}
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-xs font-semibold text-sidebar-foreground truncate" title={displayName}>
+                {displayName}
+              </span>
+              <span className="text-[10px] text-muted-foreground font-mono truncate" title={userEmail}>
+                {userEmail}
+              </span>
             </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                try {
-                  if (clerk?.signOut) clerk.signOut({ redirectUrl: "/sign-in" });
-                } catch {
-                  /* ignore */
-                }
-                window.location.href = "/sign-in";
-              }}
-              title="Sign Out"
-              className="p-1.5 rounded-lg text-sidebar-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-            >
-              <HugeiconsIcon icon={Logout01Icon} className="size-4" />
-            </button>
           </div>
-        )}
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSignOut();
+            }}
+            disabled={isSigningOut}
+            title="Log Out"
+            aria-label="Log Out"
+            className="size-8 flex items-center justify-center rounded-lg text-sidebar-muted-foreground hover:text-destructive hover:bg-destructive/15 active:scale-95 transition-all shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {isSigningOut ? (
+              <div className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <HugeiconsIcon icon={Logout01Icon} className="size-4" />
+            )}
+          </button>
+        </div>
+
+
         <Link
           href="/dashboard"
           onClick={() => setMobileMenuOpen(false)}
@@ -211,9 +232,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         </div>
 
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/30">
-          ADMIN
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/30">
+            ADMIN
+          </span>
+          {user.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt={displayName}
+              className="size-7 rounded-full border border-border/80 shadow-xs shrink-0 object-cover"
+            />
+          ) : (
+            <div className="size-7 rounded-full bg-primary/15 text-primary border border-primary/25 flex items-center justify-center font-bold text-xs shrink-0">
+              {avatarLetter}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            title="Log Out"
+            aria-label="Log Out"
+            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all shrink-0 cursor-pointer disabled:opacity-50"
+          >
+            {isSigningOut ? (
+              <div className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <HugeiconsIcon icon={Logout01Icon} className="size-4" />
+            )}
+          </button>
+        </div>
       </header>
 
       {/* Mobile Drawer Sheet */}

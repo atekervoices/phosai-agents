@@ -137,10 +137,15 @@ impl Default for SessionConfig {
             output_sample_rate: 24_000,
             greeting: None,
             models_dir: "./dsp_models".to_string(),
-            smart_turn_threshold: 0.5,
+            smart_turn_threshold: std::env::var("SMART_TURN_THRESHOLD")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0.85),
             denoise_enabled: true,
             denoise_backend: DenoiserBackend::default(),
-            smart_turn_enabled: true,
+            smart_turn_enabled: std::env::var("SMART_TURN_ENABLED")
+                .map(|v| v != "false" && v != "0")
+                .unwrap_or(true),
             turn_completion_enabled: true,
             idle_timeout_secs: 4,
             idle_max_nudges: 2,
@@ -294,9 +299,10 @@ impl VoiceSession {
                     transport.is_telephony,
                     config.escalation_destinations.clone(),
                 )
-                .with_interceptor(std::sync::Arc::new(ArtifactInterceptor::new(
-                    ArtifactStore::new(),
-                ))),
+                .with_interceptor(std::sync::Arc::new(
+                    ArtifactInterceptor::new(ArtifactStore::new())
+                        .with_agent_id(config.agent_id.clone()),
+                )),
         );
 
         let transport_control_tx = transport.control_tx.clone();

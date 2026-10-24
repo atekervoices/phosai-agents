@@ -42,6 +42,32 @@ fn extract_next_fragment(buffer: &mut String) -> Option<String> {
     let mut earliest_pos: Option<usize> = None;
     for (idx, ch) in buffer.char_indices() {
         if PUNCT_MARKS.contains(&ch) {
+            // Guard: If ch is '.', check if it's a decimal number ("3.14") or a list marker (e.g. "1. ", ":1.")
+            if ch == '.' {
+                let next = buffer[idx + 1..].chars().next();
+                if let Some(n) = next {
+                    if n.is_ascii_digit() {
+                        continue;
+                    }
+                }
+
+                let prev = buffer[..idx].chars().next_back();
+                if let Some(p) = prev {
+                    if p.is_ascii_digit() {
+                        let line_prefix = buffer[..idx - p.len_utf8()]
+                            .rsplit('\n')
+                            .next()
+                            .unwrap_or("");
+                        let is_list_prefix = line_prefix.trim().is_empty()
+                            || line_prefix.ends_with(':')
+                            || line_prefix.ends_with('-');
+                        if is_list_prefix {
+                            continue;
+                        }
+                    }
+                }
+            }
+
             earliest_pos = Some(idx);
             break;
         }

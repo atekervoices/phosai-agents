@@ -59,6 +59,7 @@ import PreviewPanel, { type PreviewTab } from "@/components/agent/preview-panel"
 import TestPanel from "@/components/agent/test-panel";
 import AgentConfigEditor from "@/components/agent/agent-config-editor";
 import EmbedConfigView from "@/components/agent/embed-config-view";
+import KnowledgePanel from "@/components/agent/knowledge-panel";
 import {
   IntegrationConnectionDialog,
   OAuthAppRegistrationDialog,
@@ -148,6 +149,7 @@ function AgentDetailPageContent() {
 
   // Credentials state
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [knowledgeDocCount, setKnowledgeDocCount] = useState(0);
   const [importedConnections, setImportedConnections] = useState<ImportedConnection[]>([]);
   const [credLoading, setCredLoading] = useState(false);
   const credentialRequestSeqRef = useRef(0);
@@ -261,7 +263,7 @@ function AgentDetailPageContent() {
     void api.oauthApps
       .list()
       .then(setOAuthApps)
-      .catch(() => {});
+      .catch(() => { });
     // Reset stale state from previous agent
     setMermaidDiagram(null);
     setMermaidRenderVersion(0);
@@ -352,7 +354,7 @@ function AgentDetailPageContent() {
       const updated = await api.agents.get(id);
       setAgent(updated);
       await Promise.allSettled([loadVersions(), loadCredentials()]);
-    } catch {}
+    } catch { }
   }, [id, loadCredentials, loadVersions]);
 
   const handleBuildStart = useCallback(() => {
@@ -777,6 +779,7 @@ function AgentDetailPageContent() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         credentialCount={credentials.length}
+        knowledgeDocCount={knowledgeDocCount}
         headerActions={
           agent?.current_config ? (
             <Button
@@ -843,11 +846,10 @@ function AgentDetailPageContent() {
                       >
                         <div
                           ref={mermaidRef}
-                          className={`inline-flex items-center justify-center p-12 [&>svg]:bg-transparent! [&_svg]:max-w-none [&_svg]:h-auto transition-all duration-500 ${
-                            flowUpdateState
+                          className={`inline-flex items-center justify-center p-12 [&>svg]:bg-transparent! [&_svg]:max-w-none [&_svg]:h-auto transition-all duration-500 ${flowUpdateState
                               ? "[&_svg]:opacity-20 [&_svg]:blur-xs"
                               : "[&_svg]:opacity-100"
-                          }`}
+                            }`}
                         />
                       </TransformComponent>
                     </TransformWrapper>
@@ -1035,6 +1037,11 @@ function AgentDetailPageContent() {
           </div>
         )}
 
+        {/* ── Knowledge ── */}
+        {activeTab === "knowledge" && (
+          <KnowledgePanel agentId={id} onUpdateCount={setKnowledgeDocCount} />
+        )}
+
         {/* ── Test ── */}
         {activeTab === "test" && (
           <TestPanel agentId={id} agent={agent} onGoToConfig={() => setActiveTab("config")} />
@@ -1091,11 +1098,10 @@ function AgentDetailPageContent() {
                         key={version.id}
                         type="button"
                         onClick={() => selectDeployVersion(version)}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                          isSelected
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${isSelected
                             ? "border-primary bg-primary/5"
                             : "border-border bg-background hover:bg-accent/30"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">

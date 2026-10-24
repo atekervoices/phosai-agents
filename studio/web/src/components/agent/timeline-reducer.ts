@@ -76,16 +76,34 @@ function isOpenBubble(entry: TimelineEntry, role: string): boolean {
  * Property A: Never increases the array length when an open bubble exists.
  */
 export function applyChunk(prev: TimelineEntry[], event: TranscriptChunkEvent): TimelineEntry[] {
-  const { role, text } = event;
+  const { role, text, is_final } = event;
+  const last = prev[prev.length - 1];
+
+  if (is_final) {
+    if (last && isOpenBubble(last, role)) {
+      const updated = [...prev];
+      const lastIdx = prev.length - 1;
+      const msg = last as MessageTimelineEntry;
+      updated[lastIdx] = { ...msg, text: text || msg.text, _final: true };
+      return updated;
+    }
+    if (text) {
+      return [...prev, { kind: "message" as const, role, text, _final: true }];
+    }
+    return prev;
+  }
+
   if (!text) return prev; // empty chunk is a no-op
 
-  const last = prev[prev.length - 1];
   if (last && isOpenBubble(last, role)) {
-    // Append to existing open bubble — no length change.
+    // For user STT streaming (e.g. Nemotron partials), text contains the full accumulated phrase
+    // similar to etoil-rust-stt-service partialText.
+    // For assistant LLM tokens, chunks are incremental tokens that should be appended.
     const updated = [...prev];
     const lastIdx = prev.length - 1;
     const msg = last as MessageTimelineEntry;
-    updated[lastIdx] = { ...msg, text: msg.text + text };
+    const nextText = role === "user" ? text : msg.text + text;
+    updated[lastIdx] = { ...msg, text: nextText };
     return updated;
   }
 

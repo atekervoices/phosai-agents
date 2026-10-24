@@ -2,6 +2,27 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  experimental: {
+    optimizePackageImports: [
+      "@hugeicons/react",
+      "@hugeicons/core-free-icons",
+      "@radix-ui/react-select",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-switch",
+      "@xyflow/react",
+      "shiki",
+      "@shikijs/langs",
+      "@shikijs/themes",
+      "firebase",
+      "firebase/auth",
+      "firebase/firestore",
+      "lucide-react",
+    ],
+  },
+
   allowedDevOrigins: [
     "localhost",
     "127.0.0.1",

@@ -35,8 +35,9 @@ export interface AssistantModalProps extends ComponentProps<"div"> {
   onClearHistory?: () => void;
 }
 
-const BUTTON_VARIANTS: Record<VoiceOrbVariant, string> = {
+const BUTTON_VARIANTS: Record<string, string> = {
   default: "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25",
+  amber: "bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25",
   blue: "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25",
   violet: "bg-violet-600 hover:bg-violet-700 text-white shadow-violet-500/25",
   emerald: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25",

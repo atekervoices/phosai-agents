@@ -214,6 +214,14 @@ Rules for star graphs:
 - ❌ Splitting a simple conversation into many trivial nodes (greet, ask_name, confirm, etc.)
 - ❌ Creating nodes named after conversation steps (greeting, collect_info, confirm_booking)
 
+## Voice-First Speech Design for System Prompts
+
+Every agent is a voice agent that speaks via Text-to-Speech (TTS). When writing `system_prompt` strings for nodes:
+- Instruct the agent to speak conversationally as if on a phone call.
+- Instruct the agent to keep turns concise (1 to 3 sentences) and ask at most one question at a time.
+- Explicitly instruct the agent to NEVER use markdown formatting (`**`, `*`, `#`), bullet points (`-`), or numbered lists (`1.`, `2.`).
+- When presenting options, instruct the agent to weave them into natural conversational sentences instead of reading out a numbered list.
+
 ## Runtime Tools (auto-injected — do NOT define these in the tools map)
 
 The runtime automatically provides these tools to every agent:

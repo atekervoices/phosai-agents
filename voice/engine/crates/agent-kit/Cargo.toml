@@ -9,7 +9,7 @@ description = "Agent orchestrator — conversation history, tool execution, LLM 
 tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "time", "macros"] }
 
 # HTTP client (tool execution, memory store)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "blocking"] }
 futures-util = "0.3"
 
 # WebSockets (for native multimodal providers)

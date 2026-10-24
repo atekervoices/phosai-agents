@@ -32,10 +32,10 @@ async def update_schema():
                 created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
                 last_used_at TIMESTAMPTZ
             );
-            CREATE INDEX IF NOT EXISTS ix_api_keys_organization_id ON api_keys (organization_id);
-            CREATE INDEX IF NOT EXISTS ix_api_keys_key_prefix ON api_keys (key_prefix);
-            CREATE INDEX IF NOT EXISTS ix_api_keys_user_id ON api_keys (user_id);
         """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_api_keys_organization_id ON api_keys (organization_id);"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_api_keys_key_prefix ON api_keys (key_prefix);"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_api_keys_user_id ON api_keys (user_id);"))
 
     print("Multi-tenant and API Key schema updates applied successfully!")
 

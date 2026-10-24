@@ -448,7 +448,16 @@ export default function ManualTestView({
             })
           );
         } else if (msg.type === "transcript_chunk") {
-          // Ignored — only canonical final transcripts drive the timeline
+          if (msg.text || msg.is_final) {
+            setVoiceTimeline((p) =>
+              applyChunk(p, {
+                type: "transcript_chunk",
+                role: msg.role || "assistant",
+                text: msg.text || "",
+                is_final: Boolean(msg.is_final),
+              })
+            );
+          }
         } else if (msg.type === "tool_activity") {
           const activity = parseToolActivityPayload(msg as Record<string, unknown>);
           if (activity) {
@@ -527,12 +536,27 @@ export default function ManualTestView({
       const res = await fetch(`${voiceBase}/voice/session/${id}`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error(`Session registration failed: ${res.status}`);
-      const { session_id, ws_url, token } = (await res.json()) as {
-        session_id: string;
-        ws_url: string;
-        token: string;
-      };
+      if (!res.ok) {
+        let errorMsg = `Session registration failed: ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) errorMsg = errData.error;
+        } catch {
+          /* response not json */
+        }
+        throw new Error(errorMsg);
+      }
+      let sessionData: { session_id: string; ws_url: string; token: string };
+      try {
+        sessionData = (await res.json()) as {
+          session_id: string;
+          ws_url: string;
+          token: string;
+        };
+      } catch {
+        throw new Error(`Voice server at ${voiceBase} returned non-JSON response.`);
+      }
+      const { session_id, ws_url, token } = sessionData;
 
       // 3. Defer WS attach until WebRTC offer/answer is established.
       // If WS connects first, the server can consume the pre-registered
@@ -548,10 +572,14 @@ export default function ManualTestView({
           `${rtcBase}/rtc/ice-servers?session_id=${session_id}&token=${token}`
         );
         if (iceRes.ok) {
-          const iceData = (await iceRes.json()) as {
-            iceServers?: RTCIceServer[];
-          };
-          if (iceData.iceServers?.length) iceServers = iceData.iceServers;
+          try {
+            const iceData = (await iceRes.json()) as {
+              iceServers?: RTCIceServer[];
+            };
+            if (iceData.iceServers?.length) iceServers = iceData.iceServers;
+          } catch {
+            /* ignore JSON parse failure on optional ICE servers */
+          }
         }
       } catch {
         /* fall back to Google STUN */
@@ -589,6 +617,7 @@ export default function ManualTestView({
       let offerComplete = false;
 
       const sendIceCandidate = (candidateSdp: string) => {
+        if (pc.connectionState === "closed" || pc.connectionState === "failed") return;
         fetch(`${rtcBase}/rtc/candidate/${session_id}?token=${token}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -607,6 +636,10 @@ export default function ManualTestView({
 
       pc.onicecandidate = (e) => {
         if (!e.candidate || !e.candidate.candidate) return;
+        // Filter out TCP candidates: voice-server only supports UDP on port 50000
+        if (e.candidate.protocol === "tcp" || e.candidate.candidate.includes(" tcp ")) {
+          return;
+        }
         if (!offerComplete) {
           iceCandidateBuffer.push(e.candidate.candidate);
           return;
@@ -630,10 +663,17 @@ export default function ManualTestView({
         body: JSON.stringify({ offer: { sdp: offer.sdp, type: offer.type } }),
       });
 
-      const rtcData = await rtcRes.json();
       if (!rtcRes.ok) {
-        throw new Error(rtcData.error || `WebRTC offer failed: ${rtcRes.status}`);
+        let errorMsg = `WebRTC offer failed: ${rtcRes.status}`;
+        try {
+          const errData = await rtcRes.json();
+          if (errData?.error) errorMsg = errData.error;
+        } catch {
+          /* response was not JSON */
+        }
+        throw new Error(errorMsg);
       }
+      const rtcData = await rtcRes.json();
       const { answer } = rtcData as { answer: RTCSessionDescriptionInit };
 
       // 12. Set remote description
@@ -648,34 +688,39 @@ export default function ManualTestView({
 
       // 14. Connect WebSocket for UI events (transcripts, state, tools)
       let resolvedWsUrl = ws_url;
-      if (typeof window !== "undefined") {
-        const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsHost = window.location.host;
-        try {
-          const parsed = new URL(ws_url.replace(/^wss?:/, "http:"));
-          resolvedWsUrl = `${wsProto}//${wsHost}${parsed.pathname}${parsed.search}`;
-        } catch {
-          if (isHttpsPage && resolvedWsUrl.startsWith("ws://")) {
-            resolvedWsUrl = resolvedWsUrl.replace(/^ws:\/\//, "wss://");
-          }
+      try {
+        const parsed = new URL(ws_url.replace(/^wss?:/, "http:"));
+        const wsProto = isHttpsPage ? "wss:" : "ws:";
+        let host = parsed.host;
+
+        if (latestVoiceServerUrl) {
+          try {
+            const vUrl = new URL(latestVoiceServerUrl);
+            host = vUrl.host;
+          } catch {}
+        } else if (parsed.hostname === "voice-server") {
+          host = `${typeof window !== "undefined" ? window.location.hostname : "127.0.0.1"}:${parsed.port || "8300"}`;
+        }
+
+        resolvedWsUrl = `${wsProto}//${host}${parsed.pathname}${parsed.search}`;
+      } catch {
+        if (isHttpsPage && resolvedWsUrl.startsWith("ws://")) {
+          resolvedWsUrl = resolvedWsUrl.replace(/^ws:\/\//, "wss://");
         }
       }
+
       const ws = new WebSocket(resolvedWsUrl);
       wsRef.current = ws;
       ws.onmessage = handleWsMsg;
-      ws.onerror = () => {
-        if (wsRef.current !== ws) return;
-        showVoiceErrorToast();
-        stopVoice();
+      ws.onerror = (e) => {
+        console.warn("[voice-ws] WebSocket telemetry error:", e);
       };
       ws.onclose = (ev) => {
         if (wsRef.current !== ws) return;
         if (ev.code === 1000 || ev.code === 1005) {
           voiceStopExpectedRef.current = true;
-        } else {
-          showVoiceErrorToast();
+          stopVoice();
         }
-        stopVoice();
       };
 
       setVoiceState("listening");
@@ -802,74 +847,52 @@ export default function ManualTestView({
             </div>
           ) : (
             <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-2">
-              {voiceState !== "idle" ? (
-                <VoiceConversation
-                  mode={
-                    voiceState === "connecting"
-                      ? "connecting"
-                      : voiceState === "speaking"
-                      ? "speaking"
-                      : voiceState === "processing" || voiceState === "toolcalling"
-                      ? "thinking"
-                      : "listening"
-                  }
-                  amplitude={
-                    measuredVolume > 0
-                      ? measuredVolume
-                      : voiceState === "speaking"
-                      ? 0.65
-                      : voiceState === "listening"
-                      ? 0.45
-                      : 0.1
-                  }
-                  transcript={voiceTimeline
-                    .filter(
-                      (entry): entry is Extract<TimelineEntry, { kind: "message" }> =>
-                        entry.kind === "message"
-                    )
-                    .map((t, idx) => ({
-                      id: `turn-${idx}`,
-                      role: t.role === "user" ? "user" : "assistant",
-                      text: t.text,
-                    }))}
-                  muted={isMuted}
-                  onToggleMute={toggleMute}
-                  onInterrupt={stopVoice}
-                  onEnd={stopVoice}
-                  className="my-auto shadow-2xl"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center w-full max-w-md">
-                  <div className="mb-6 flex items-center justify-center">
-                    <VoiceOrb state="idle" variant="default" className="scale-110" />
-                  </div>
-
-                  <h3 className="text-xl font-bold tracking-tight mb-2">Voice Sandbox</h3>
-                  <p className="max-w-[320px] text-xs text-muted-foreground leading-relaxed mb-8">
-                    {isMissingVoiceId ? (
-                      <span className="text-destructive font-semibold">
-                        No voice selected.{" "}
-                        {onGoToConfig && (
-                          <button
-                            onClick={onGoToConfig}
-                            className="underline underline-offset-2 hover:opacity-80"
-                          >
-                            Configure Voice
-                          </button>
-                        )}
-                      </span>
-                    ) : (
-                      "Experience high-fidelity conversational AI with low-latency WebRTC audio streams."
-                    )}
-                  </p>
-
-                  <VoiceControl
-                    state="idle"
-                    onConnect={startVoice}
-                    className="w-full max-w-sm"
-                  />
-                </div>
-              )}
+              <VoiceConversation
+                agentName={agent?.name || "AI Agent"}
+                mode={
+                  voiceState === "idle"
+                    ? "idle"
+                    : voiceState === "connecting"
+                    ? "connecting"
+                    : voiceState === "speaking"
+                    ? "speaking"
+                    : voiceState === "processing" || voiceState === "toolcalling"
+                    ? "thinking"
+                    : "listening"
+                }
+                amplitude={
+                  measuredVolume > 0
+                    ? measuredVolume
+                    : voiceState === "speaking"
+                    ? 0.65
+                    : voiceState === "listening"
+                    ? 0.45
+                    : 0.1
+                }
+                transcript={voiceTimeline
+                  .filter(
+                    (entry): entry is Extract<TimelineEntry, { kind: "message" }> =>
+                      entry.kind === "message"
+                  )
+                  .map((t, idx) => ({
+                    id: `turn-${idx}`,
+                    role: t.role === "user" ? "user" : "assistant",
+                    text: t.text,
+                    isPartial: !t._final,
+                  }))}
+                muted={isMuted}
+                onToggleMute={toggleMute}
+                onInterrupt={stopVoice}
+                onEnd={stopVoice}
+                onStart={startVoice}
+                disabled={isMissingVoiceId}
+                disabledReason={
+                  isMissingVoiceId
+                    ? "No voice configured. Please select a voice in Agent Settings."
+                    : undefined
+                }
+                className="my-auto shadow-2xl"
+              />
             </div>
           )}
         </div>

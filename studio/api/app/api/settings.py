@@ -229,6 +229,19 @@ _API_KEY_FIELD = VoiceProviderField(
 STT_PROVIDERS: list[VoiceProviderOption] = [
     # ── Self-hosted ────────────────────────────────────────────────
     VoiceProviderOption(
+        value="nemotron",
+        label="Nemotron Streaming ASR",
+        description="NVIDIA Nemotron 3.5 Cache-Aware Streaming WebSocket ASR",
+        default_base_url="https://stt-staging.atekervoices.com",
+        fields=[
+            VoiceProviderField(
+                key="model",
+                label="Model",
+                placeholder="phosai-streaming-voice-v1",
+            ),
+        ],
+    ),
+    VoiceProviderOption(
         value="canary",
         label="Canary STT",
         description="NVIDIA NeMo Canary / Parakeet ASR endpoint",
@@ -578,7 +591,7 @@ async def _get_all_credentials(
     result = await db.execute(query)
     rows = result.scalars().all()
     out: dict[str, bool] = {}
-    no_key_providers = {"canary", "phosai-ws", "phosai", "faster-whisper", "fish-speech"}
+    no_key_providers = {"canary", "canary-ws", "nemotron", "etoil-stt", "phosai-ws", "phosai", "faster-whisper", "fish-speech"}
     for slug in provider_slugs:
         if slug in no_key_providers:
             out[slug] = True

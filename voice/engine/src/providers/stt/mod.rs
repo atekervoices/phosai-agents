@@ -33,6 +33,7 @@ pub mod cartesia;
 pub mod deepgram;
 pub mod elevenlabs;
 pub mod groq;
+pub mod nemotron;
 pub mod openai_realtime;
 pub mod openai_whisper;
 pub mod phosai_realtime;
@@ -156,8 +157,35 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
             &cfg.model,
             base_lang, // ISO-639-1 only
         )),
-        "canary" => Box::new(canary::CanarySttProvider::new(
+        "canary" => {
+            if cfg.base_url.starts_with("ws://")
+                || cfg.base_url.starts_with("wss://")
+                || cfg.base_url.contains(":8099")
+            {
+                Box::new(nemotron::NemotronSttProvider::new(
+                    &cfg.base_url,
+                    &cfg.api_key,
+                    &cfg.model,
+                    &cfg.language,
+                ))
+            } else {
+                Box::new(canary::CanarySttProvider::new(
+                    &cfg.base_url,
+                    &cfg.language,
+                ))
+            }
+        }
+        // NVIDIA Nemotron 3.5 Streaming WebSocket STT (etoil-rust-stt-service)
+        "nemotron"
+        | "nemotron-stt"
+        | "nemotron-ws"
+        | "canary-ws"
+        | "canary_ws"
+        | "etoil"
+        | "etoil-stt" => Box::new(nemotron::NemotronSttProvider::new(
             &cfg.base_url,
+            &cfg.api_key,
+            &cfg.model,
             &cfg.language,
         )),
         "elevenlabs" => Box::new(elevenlabs::ElevenLabsSttProvider::new(
@@ -210,7 +238,7 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
 ///
 /// | Category              | Providers                                                              | P99     |
 /// |-----------------------|------------------------------------------------------------------------|---------|
-/// | Streaming WS          | `deepgram`, `cartesia`, `openai-realtime`, `phosai-stt`                | 600 ms  |
+/// | Streaming WS          | `deepgram`, `cartesia`, `openai-realtime`, `phosai-stt`, `nemotron`   | 600 ms  |
 /// | Segmented HTTP (fast) | `groq`, `phosai-http`                                                  | 1000 ms |
 /// | Segmented HTTP (med)  | `openai-whisper`                                                       | 1200 ms |
 /// | Segmented HTTP (slow) | `elevenlabs`                                                           | 1500 ms |
@@ -224,7 +252,22 @@ pub fn build_stt_provider(cfg: &SttProviderConfig) -> Box<dyn SttProvider> {
 pub fn default_stt_p99_latency_ms(provider: &str) -> u32 {
     match provider {
         // Streaming WS — incremental processing, fast finalize → transcript
-        "deepgram" | "cartesia" | "openai-realtime" | "phosai-stt" | "phosai" | "phosai-realtime" | "phosai-ws" | "phosai_stt" | "phostt" => 600,
+        "deepgram"
+        | "cartesia"
+        | "openai-realtime"
+        | "phosai-stt"
+        | "phosai"
+        | "phosai-realtime"
+        | "phosai-ws"
+        | "phosai_stt"
+        | "phostt"
+        | "nemotron"
+        | "nemotron-stt"
+        | "nemotron-ws"
+        | "canary-ws"
+        | "canary_ws"
+        | "etoil"
+        | "etoil-stt" => 600,
         // Segmented HTTP — upload + inference round-trip
         "groq" | "phosai-http" | "phosai-stt-http" | "phostt-http" | "phos-whisper" | "phosai-whisper" => 1000,
         "openai-whisper" => 1200,
@@ -248,6 +291,10 @@ mod tests {
             "phosai-stt",
             "phosai-realtime",
             "phostt",
+            "nemotron",
+            "nemotron-stt",
+            "canary-ws",
+            "etoil-stt",
         ] {
             assert_eq!(
                 default_stt_p99_latency_ms(provider),

@@ -16,7 +16,6 @@ COPY studio/web/ ./
 # Disable Next.js telemetry and build production bundle
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_cGhvcy1haS1kZXYtYnVpbGQtcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA
 
 RUN pnpm run build
 

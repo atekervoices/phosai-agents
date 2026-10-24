@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1 — builder
 #   Installs Rust + build tools, compiles PyO3 extensions, syncs Python deps.

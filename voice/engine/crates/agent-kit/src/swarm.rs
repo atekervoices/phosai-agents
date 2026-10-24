@@ -111,9 +111,11 @@ pub const ON_HOLD_TOOL_NAME: &str = "on_hold";
 pub const ESCALATE_CALL_TOOL_NAME: &str = "escalate_call";
 
 // Re-export artifact tool names so callers don't need to depend on artifact_store directly.
-pub use crate::artifact_store::{LIST_ARTIFACTS_TOOL, READ_ARTIFACT_TOOL, SAVE_ARTIFACT_TOOL};
+pub use crate::artifact_store::{
+    LIST_ARTIFACTS_TOOL, READ_ARTIFACT_TOOL, SAVE_ARTIFACT_TOOL, SEARCH_KNOWLEDGE_BASE_TOOL,
+};
 
-/// Generate the three artifact tool schemas (save / read / list).
+/// Generate the four synthetic built-in tool schemas (save / read / list / search_knowledge_base).
 pub fn make_artifact_tool_schemas() -> Vec<serde_json::Value> {
     vec![
         json!({
@@ -168,6 +170,23 @@ pub fn make_artifact_tool_schemas() -> Vec<serde_json::Value> {
                 "parameters": {
                     "type": "object",
                     "properties": {}
+                }
+            }
+        }),
+        json!({
+            "type": "function",
+            "function": {
+                "name": SEARCH_KNOWLEDGE_BASE_TOOL,
+                "description": "Search the agent's knowledge base for relevant facts, policies, instructions, documentation, FAQs, or answers to caller questions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The natural language query or question to search the knowledge base for"
+                        }
+                    },
+                    "required": ["query"]
                 }
             }
         }),

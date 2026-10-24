@@ -46,6 +46,8 @@ dependencies = [
     "python-slugify>=8.0.4",
     "itsdangerous>=2.2.0",
     "resend>=2.29.0",
+    "firebase-admin>=6.5.0",
+    "fastembed>=0.4.0",
 ]
 
 [dependency-groups]

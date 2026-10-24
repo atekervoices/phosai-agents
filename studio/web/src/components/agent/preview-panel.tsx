@@ -8,15 +8,17 @@ import {
   Settings05Icon,
   WorkflowSquare10Icon,
   GlobeIcon,
+  DatabaseIcon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 
-export type PreviewTab = "flow" | "config" | "credentials" | "test" | "embed";
+export type PreviewTab = "flow" | "config" | "credentials" | "knowledge" | "test" | "embed";
 
 interface PreviewPanelProps {
   activeTab: PreviewTab;
   setActiveTab: (tab: PreviewTab) => void;
   credentialCount: number;
+  knowledgeDocCount?: number;
   headerActions?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -29,6 +31,7 @@ const tabs: {
   { key: "config", label: "Config", icon: Settings05Icon },
   { key: "flow", label: "Flow", icon: WorkflowSquare10Icon },
   { key: "credentials", label: "Connections", icon: ConnectIcon },
+  { key: "knowledge", label: "Knowledge", icon: DatabaseIcon },
   { key: "test", label: "Test", icon: HeadsetIcon },
   { key: "embed", label: "Embed", icon: GlobeIcon },
 ];
@@ -37,6 +40,7 @@ export default function PreviewPanel({
   activeTab,
   setActiveTab,
   credentialCount,
+  knowledgeDocCount = 0,
   headerActions,
   children,
 }: PreviewPanelProps) {
@@ -74,6 +78,18 @@ export default function PreviewPanel({
                   )}
                 >
                   {credentialCount}
+                </span>
+              )}
+              {tab.key === "knowledge" && knowledgeDocCount > 0 && (
+                <span
+                  className={cn(
+                    "flex items-center justify-center min-w-5 h-4 rounded-full text-[10px] font-black tracking-tight",
+                    activeTab === tab.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {knowledgeDocCount}
                 </span>
               )}
             </button>

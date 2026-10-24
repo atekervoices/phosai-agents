@@ -11,7 +11,7 @@ name: feros-voice-agent-os
 services:
   # PostgreSQL Database
   db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-voice-agent-os}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -42,8 +42,15 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       OPENAI_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+    extra_hosts:
+      - "stt-staging.atekervoices.com:104.21.78.126"
+      - "tts.atekervoices.com:104.21.78.126"
+      - "whisper-stt.atekervoices.com:104.21.78.126"
+      - "api.openai.com:172.66.0.243"
+      - "api.deepgram.com:4.20.80.211"
     volumes:
       - ./studio/api:/app
       - recordings:/recordings
@@ -67,6 +74,12 @@ services:
     build:
       context: .
       dockerfile: voice/server/Dockerfile
+    extra_hosts:
+      - "stt-staging.atekervoices.com:104.21.78.126"
+      - "tts.atekervoices.com:104.21.78.126"
+      - "whisper-stt.atekervoices.com:104.21.78.126"
+      - "api.openai.com:172.66.0.243"
+      - "api.deepgram.com:4.20.80.211"
     ports:
       - "8300:8300"
       - "50000:50000/udp"
@@ -86,14 +99,20 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-${OPENAI_API_KEY:-}}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
-      STT_PROVIDER: ${STT_PROVIDER:-phosai-stt}
-      STT_BASE_URL: ${STT_BASE_URL:-https://whisper-stt.atekervoices.com}
-      STT_MODEL: ${STT_MODEL:-phosai-stt-v1}
+      STT_PROVIDER: ${STT_PROVIDER:-nemotron}
+      STT_BASE_URL: ${STT_BASE_URL:-https://stt-staging.atekervoices.com}
+      STT_MODEL: ${STT_MODEL:-phosai-streaming-voice-v1}
       STT_API_KEY: ${STT_API_KEY:-}
-      TTS_PROVIDER: ${TTS_PROVIDER:-phosai-ws}
-      TTS_BASE_URL: ${TTS_BASE_URL:-https://tts.atekervoices.com}
-      TTS_MODEL: ${TTS_MODEL:-spark-tts}
-      TTS_VOICE_ID: ${TTS_VOICE_ID:-pcm_female_1}
+      NEMOTRON_STT_URL: ${NEMOTRON_STT_URL:-${STT_BASE_URL:-https://stt-staging.atekervoices.com/}}
+      CANARY_STT_URL: ${CANARY_STT_URL:-${STT_BASE_URL:-https://stt-staging.atekervoices.com/}}
+      TTS_PROVIDER: ${TTS_PROVIDER:-openai}
+      TTS_BASE_URL: ${TTS_BASE_URL:-https://api.openai.com/v1}
+      TTS_MODEL: ${TTS_MODEL:-tts-1}
+      TTS_VOICE_ID: ${TTS_VOICE_ID:-alloy}
+      TTS_API_KEY: ${OPENAI_API_KEY:-${LLM_API_KEY:-}}
+      DEEPGRAM_API_KEY: ${DEEPGRAM_API_KEY:-ee78b1cb7f384fc82c2d59946d31a6507a992ff0}
+      FEROS_VAD_SILENCE_FRAMES: 16
+      SMART_TURN_THRESHOLD: "0.85"
       # Write recordings to /recordings (shared with studio-api container via named volume).
       # The Python studio-api serves them at /api/recordings/{filename}.
       RECORDING__OUTPUT_URI: "file:///recordings"
@@ -117,15 +136,19 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
       NEXT_PUBLIC_VOICE_SERVER_URL: ${NEXT_PUBLIC_VOICE_SERVER_URL:-${VOICE_SERVER__PUBLIC_URL:-}}
       BACKEND_API_URL: http://studio-api:8000
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-}
-      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
-      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
-      NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-/dashboard}
-      NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/dashboard}
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-${VITE_FIREBASE_API_KEY:-}}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-${VITE_FIREBASE_AUTH_DOMAIN:-}}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-${VITE_FIREBASE_PROJECT_ID:-}}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:-${VITE_FIREBASE_STORAGE_BUCKET:-}}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:-${VITE_FIREBASE_MESSAGING_SENDER_ID:-}}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:-${VITE_FIREBASE_APP_ID:-}}
+      NEXT_PUBLIC_FIREBASE_DATABASE_URL: ${NEXT_PUBLIC_FIREBASE_DATABASE_URL:-${VITE_FIREBASE_DATABASE_URL:-}}
+      NEXT_PUBLIC_ADMIN_EMAIL: ${ADMIN_EMAIL:-simonallanachuka@gmail.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-simonallanachuka@gmail.com}
       AUTH__SUPERADMIN_API_KEY: ${AUTH__SUPERADMIN_API_KEY:-}
       STUDIO_SUPERADMIN_API_KEY: ${STUDIO_SUPERADMIN_API_KEY:-}
       NODE_ENV: ${NODE_ENV:-production}
+      WATCHPACK_POLLING: "true"
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
     volumes:
@@ -136,7 +159,7 @@ services:
     depends_on:
       - studio-api
     command: >
-      sh -c "pnpm install &&
+      sh -c "pnpm install --config.confirmModulesPurge=false &&
              if [ \"$$NODE_ENV\" = \"development\" ]; then
                pnpm dev -H 0.0.0.0;
              else

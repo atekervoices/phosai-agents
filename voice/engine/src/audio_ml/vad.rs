@@ -44,10 +44,15 @@ impl Default for VadConfig {
             .and_then(|v| v.parse::<f32>().ok())
             .unwrap_or(0.0060);
 
+        let silence_frames = std::env::var("FEROS_VAD_SILENCE_FRAMES")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(16); // 16 frames = 512ms (prevents premature cutoffs on natural human pauses)
+
         Self {
             threshold: VAD_THRESHOLD_IDLE,
             min_volume,
-            silence_frames: 6,
+            silence_frames,
             min_speech_frames: 6, // Increased from 3 (96ms) to 6 (192ms) to filter pops/echo
             lookback_frames: 20,
             context_size: 64,

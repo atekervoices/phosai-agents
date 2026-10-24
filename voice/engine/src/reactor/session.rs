@@ -411,8 +411,14 @@ impl Reactor {
                 // Capture STT TTFB: finalize_sent → first text from STT server.
                 self.tracer.mark_stt_first_text();
             }
-            SttEvent::PartialTranscript(_) => {
-                // Interim results ignored — only final transcripts drive UI/LLM
+            SttEvent::PartialTranscript(text) => {
+                if !text.is_empty() {
+                    self.tracer.emit(voice_trace::Event::TranscriptChunk {
+                        role: "user".to_string(),
+                        text,
+                        is_final: false,
+                    });
+                }
             }
             SttEvent::Error(reason) => {
                 // The STT WS connection died and reconnect was exhausted.
@@ -424,6 +430,13 @@ impl Reactor {
                 self.tracer.trace("Transcript");
                 self.tracer.mark_transcript();
                 info!("[reactor] Transcript: '{}'", text);
+
+                if !text.is_empty() {
+                    self.tracer.emit(voice_trace::Event::Transcript {
+                        role: "user".to_string(),
+                        text: text.clone(),
+                    });
+                }
 
                 // Notify hooks — called before dispatch so hooks see every
                 // transcript including empty ones (which cancel idle timers).

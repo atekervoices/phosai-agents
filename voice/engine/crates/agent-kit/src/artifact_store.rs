@@ -29,6 +29,7 @@ use crate::agent_backends::{AfterToolCallAction, BeforeToolCallAction, ToolInter
 pub const SAVE_ARTIFACT_TOOL: &str = "save_artifact";
 pub const READ_ARTIFACT_TOOL: &str = "read_artifact";
 pub const LIST_ARTIFACTS_TOOL: &str = "list_artifacts";
+pub const SEARCH_KNOWLEDGE_BASE_TOOL: &str = "search_knowledge_base";
 
 /// Maximum artifact content length (bytes).  Prevents a runaway LLM from
 /// bloating the in-memory store.
@@ -57,11 +58,20 @@ impl ArtifactStore {
 /// execution.
 pub struct ArtifactInterceptor {
     store: ArtifactStore,
+    agent_id: Option<String>,
 }
 
 impl ArtifactInterceptor {
     pub fn new(store: ArtifactStore) -> Self {
-        Self { store }
+        Self {
+            store,
+            agent_id: None,
+        }
+    }
+
+    pub fn with_agent_id(mut self, agent_id: String) -> Self {
+        self.agent_id = Some(agent_id);
+        self
     }
 }
 
@@ -71,6 +81,10 @@ impl ToolInterceptor for ArtifactInterceptor {
             SAVE_ARTIFACT_TOOL => BeforeToolCallAction::Stub(handle_save(&self.store, arguments)),
             READ_ARTIFACT_TOOL => BeforeToolCallAction::Stub(handle_read(&self.store, arguments)),
             LIST_ARTIFACTS_TOOL => BeforeToolCallAction::Stub(handle_list(&self.store)),
+            SEARCH_KNOWLEDGE_BASE_TOOL => BeforeToolCallAction::Stub(handle_knowledge_search(
+                self.agent_id.as_deref(),
+                arguments,
+            )),
             _ => BeforeToolCallAction::Proceed,
         }
     }
@@ -156,6 +170,67 @@ fn handle_list(store: &ArtifactStore) -> String {
         .collect();
     lines.sort();
     lines.join("\n")
+}
+
+fn handle_knowledge_search(agent_id_opt: Option<&str>, arguments: &str) -> String {
+    let v: serde_json::Value = match serde_json::from_str(arguments) {
+        Ok(v) => v,
+        Err(e) => return format!("Error: invalid arguments — {e}"),
+    };
+
+    let query = match v.get("query").and_then(|q| q.as_str()) {
+        Some(q) if !q.trim().is_empty() => q.trim(),
+        _ => return "Error: missing or empty 'query' parameter".to_string(),
+    };
+
+    let agent_id = match agent_id_opt {
+        Some(id) if !id.trim().is_empty() => id.trim(),
+        _ => return "No knowledge base configured for this agent.".to_string(),
+    };
+
+    let api_url = std::env::var("BACKEND_API_URL")
+        .or_else(|_| std::env::var("STUDIO_API_URL"))
+        .unwrap_or_else(|_| "http://studio-api:8000".to_string());
+
+    let endpoint = format!("{api_url}/api/agents/{agent_id}/knowledge-search");
+
+    let body = serde_json::json!({
+        "query": query,
+        "top_k": 3,
+        "similarity_threshold": 0.2
+    });
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_millis(2500))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return format!("Knowledge search client error: {e}"),
+    };
+
+    match client.post(&endpoint).json(&body).send() {
+        Ok(res) => {
+            if let Ok(data) = res.json::<serde_json::Value>() {
+                if let Some(hits) = data.get("hits").and_then(|h| h.as_array()) {
+                    if hits.is_empty() {
+                        return "No relevant information found in the knowledge base for this query.".to_string();
+                    }
+                    let mut output = String::from("Found matching knowledge base information:\n");
+                    for (i, hit) in hits.iter().enumerate() {
+                        if let Some(c) = hit.get("content").and_then(|c| c.as_str()) {
+                            output.push_str(&format!("\n--- Match {} ---\n{}\n", i + 1, c.trim()));
+                        }
+                    }
+                    return output;
+                }
+            }
+            "No relevant results returned from knowledge base.".to_string()
+        }
+        Err(e) => {
+            tracing::warn!("[knowledge_search] Failed to search knowledge base: {e}");
+            format!("Knowledge base query error: {e}")
+        }
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────

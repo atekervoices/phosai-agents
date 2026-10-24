@@ -458,7 +458,14 @@ async fn agent_config_for_id(
         .unwrap_or("");
 
     let agent_graph: Option<AgentGraphDef> = if schema == "v3_graph" {
-        match serde_json::from_value(config_json.clone()) {
+        let mut clean_json = config_json.clone();
+        if let Some(map) = clean_json.as_object_mut() {
+            map.remove("stt_model");
+            map.remove("stt_provider");
+            map.remove("sttModel");
+            map.remove("sttProvider");
+        }
+        match serde_json::from_value(clean_json) {
             Ok(g) => Some(g),
             Err(e) => {
                 warn!("Failed to parse AgentGraphDef for agent {agent_id}: {e}");
@@ -502,29 +509,61 @@ async fn agent_config_for_id(
     let mut tts = provider_map.get("tts").cloned().unwrap_or_default();
 
     // If agent specifies a custom tts_provider, override the global TTS settings.
-    if let Some(ref graph) = agent_graph {
-        if let Some(ref custom_provider) = graph.tts_provider {
-            // If the custom provider differs from the global one, fetch its credentials.
-            if custom_provider != &tts.provider {
-                let custom_tts = fetch_provider(pool, "tts", custom_provider).await;
-                if !custom_tts.provider.is_empty() {
-                    tts = custom_tts;
-                } else {
-                    warn!(
-                        "agent {agent_id}: custom tts_provider '{custom_provider}' not found in \
-                         provider_configs — falling back to global TTS provider '{}'",
-                        tts.provider
-                    );
-                }
+    let custom_tts_provider = agent_graph
+        .as_ref()
+        .and_then(|g| g.tts_provider.as_ref())
+        .cloned()
+        .or_else(|| {
+            config_json
+                .get("tts_provider")
+                .or_else(|| config_json.get("ttsProvider"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    let custom_tts_model = agent_graph
+        .as_ref()
+        .and_then(|g| g.tts_model.as_ref())
+        .cloned()
+        .or_else(|| {
+            config_json
+                .get("tts_model")
+                .or_else(|| config_json.get("ttsModel"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    let custom_voice_id = agent_graph
+        .as_ref()
+        .and_then(|g| g.voice_id.as_ref())
+        .cloned()
+        .or_else(|| {
+            config_json
+                .get("voice_id")
+                .or_else(|| config_json.get("voiceId"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        });
+
+    if let Some(ref custom_provider) = custom_tts_provider {
+        if custom_provider != &tts.provider {
+            let custom_tts = fetch_provider(pool, "tts", custom_provider).await;
+            if !custom_tts.provider.is_empty() {
+                tts = custom_tts;
+            } else {
+                warn!(
+                    "agent {agent_id}: custom tts_provider '{custom_provider}' not found in \
+                     provider_configs — using provider name '{custom_provider}'"
+                );
+                tts.provider = custom_provider.clone();
             }
-            // Override the model if specified
-            if let Some(ref m) = graph.tts_model {
-                tts.model = m.clone();
-            }
-        } else if let Some(ref m) = graph.tts_model {
-            // Even if no custom provider is specified, we might have a custom model
-            tts.model = m.clone();
         }
+    }
+    if let Some(ref m) = custom_tts_model {
+        tts.model = m.clone();
+    }
+    if let Some(ref v) = custom_voice_id {
+        tts.voice_id = v.clone();
     }
 
     let llm_key = {
@@ -567,13 +606,34 @@ async fn agent_config_for_id(
             stt.provider.clone()
         },
         stt_model: if stt.model.is_empty() {
-            std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-stt-v1".to_string())
+            let prov = if stt.provider.is_empty() {
+                std::env::var("STT_PROVIDER").unwrap_or_default()
+            } else {
+                stt.provider.clone()
+            };
+            if prov == "nemotron" || prov == "canary-ws" || prov == "etoil" || prov == "etoil-stt" {
+                std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-streaming-voice-v1".to_string())
+            } else {
+                std::env::var("STT_MODEL").unwrap_or_else(|_| "phosai-stt-v1".to_string())
+            }
         } else {
             stt.model.clone()
         },
         stt_base_url: if stt.base_url.is_empty() {
-            std::env::var("STT_BASE_URL")
-                .unwrap_or_else(|_| "https://whisper-stt.atekervoices.com".to_string())
+            let prov = if stt.provider.is_empty() {
+                std::env::var("STT_PROVIDER").unwrap_or_default()
+            } else {
+                stt.provider.clone()
+            };
+            if prov == "nemotron" || prov == "canary-ws" || prov == "etoil" || prov == "etoil-stt" {
+                std::env::var("NEMOTRON_STT_URL")
+                    .or_else(|_| std::env::var("ETOIL_STT_URL"))
+                    .or_else(|_| std::env::var("STT_BASE_URL"))
+                    .unwrap_or_else(|_| "https://stt-staging.atekervoices.com".to_string())
+            } else {
+                std::env::var("STT_BASE_URL")
+                    .unwrap_or_else(|_| "https://whisper-stt.atekervoices.com".to_string())
+            }
         } else {
             stt.base_url.clone()
         },
@@ -588,15 +648,43 @@ async fn agent_config_for_id(
         } else {
             tts.model.clone()
         },
-        tts_base_url: if tts.base_url.is_empty() {
-            std::env::var("TTS_BASE_URL")
-                .unwrap_or_else(|_| "https://tts.atekervoices.com".to_string())
+        tts_base_url: if tts.base_url.is_empty() || tts.base_url == "http://localhost:8200" {
+            let prov = if tts.provider.is_empty() {
+                std::env::var("TTS_PROVIDER").unwrap_or_default()
+            } else {
+                tts.provider.clone()
+            };
+            if prov == "openai" {
+                std::env::var("TTS_BASE_URL")
+                    .unwrap_or_else(|_| "https://api.openai.com/v1".to_string())
+            } else if prov == "deepgram-ws" || prov == "deepgram" {
+                "https://api.deepgram.com".to_string()
+            } else {
+                std::env::var("TTS_BASE_URL")
+                    .unwrap_or_else(|_| "https://tts.atekervoices.com".to_string())
+            }
         } else {
             tts.base_url.clone()
         },
-        tts_api_key: tts.resolved_api_key(engine),
+        tts_api_key: {
+            let k = tts.resolved_api_key(engine);
+            if k.is_empty() {
+                if tts.provider == "deepgram-ws" || tts.provider == "deepgram" {
+                    std::env::var("DEEPGRAM_API_KEY")
+                        .or_else(|_| std::env::var("TTS_API_KEY"))
+                        .unwrap_or_default()
+                } else {
+                    std::env::var("TTS_API_KEY")
+                        .or_else(|_| std::env::var("OPENAI_API_KEY"))
+                        .or_else(|_| std::env::var("LLM_API_KEY"))
+                        .unwrap_or_default()
+                }
+            } else {
+                k
+            }
+        },
         tts_voice_id: if tts.voice_id.is_empty() {
-            std::env::var("TTS_VOICE_ID").unwrap_or_else(|_| "pcm_female_1".to_string())
+            std::env::var("TTS_VOICE_ID").unwrap_or_else(|_| "alloy".to_string())
         } else {
             tts.voice_id.clone()
         },

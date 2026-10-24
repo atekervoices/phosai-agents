@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
             {loading ? (
               <tr>
                 <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">
-                  Loading user accounts from Clerk Directory...
+                  Loading user accounts from User Directory...
                 </td>
               </tr>
             ) : filteredUsers.length === 0 ? (

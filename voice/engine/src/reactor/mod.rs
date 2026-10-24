@@ -1152,9 +1152,9 @@ impl Reactor {
 fn clean_for_tts(token: &str) -> String {
     token
         .chars()
-        .filter(|c| !c.is_ascii_control() && *c != '*' && *c != '#' && *c != '_')
+        .filter(|c| !c.is_ascii_control() && !matches!(*c, '*' | '#' | '_' | '~' | '`' | '>' | '•' | '⁃' | '◦' | '▪' | '▫'))
         .filter(|c| {
-            !matches!(c, '\u{1F600}'..='\u{1F6FF}' | '\u{2600}'..='\u{26FF}' | '\u{2700}'..='\u{27BF}')
+            !matches!(c, '\u{1F300}'..='\u{1FAFF}' | '\u{2600}'..='\u{26FF}' | '\u{2700}'..='\u{27BF}')
         })
         .collect()
 }

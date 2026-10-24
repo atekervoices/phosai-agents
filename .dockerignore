@@ -17,6 +17,9 @@
 studio/web/node_modules/
 studio/web/.next/
 studio/web/.turbo/
+**/.pnpm-store/
+**/.clerk/
+
 
 # ── Version control ───────────────────────────────────────────────
 .git/

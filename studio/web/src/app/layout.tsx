@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { ClerkProvider } from "@clerk/nextjs";
+import { AuthProvider } from "@/contexts/auth-context";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_SITE_DESCRIPTION, APP_TITLE } from "@/lib/constants";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], preload: false });
+const inter = { className: "font-sans antialiased" };
 
 export const metadata: Metadata = {
   title: APP_TITLE,
@@ -23,9 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const isClerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-
-  const content = (
+  return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script
@@ -35,23 +32,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <NuqsAdapter>
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-            {children}
-            <Toaster position="bottom-right" />
-          </ThemeProvider>
-        </NuqsAdapter>
+        <AuthProvider>
+          <NuqsAdapter>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+              {children}
+              <Toaster position="bottom-right" />
+            </ThemeProvider>
+          </NuqsAdapter>
+        </AuthProvider>
       </body>
     </html>
-  );
-
-  if (isClerkEnabled) {
-    return <ClerkProvider>{content}</ClerkProvider>;
-  }
-
-  return (
-    <ClerkProvider publishableKey="pk_test_cGhvcy1haS1kZXYtYnVpbGQtcGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA">
-      {content}
-    </ClerkProvider>
   );
 }
