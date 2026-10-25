@@ -1170,78 +1170,108 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const [llmRes, voiceLlmRes, nmRes, sttRes, ttsRes, telephonyRes, observabilityRes] =
-        await Promise.all([
-          api.settings.getLLM(),
-          api.settings.getVoiceLLM(),
-          api.settings.getNativeMultimodal(),
-          api.settings.getSTT(),
-          api.settings.getTTS(),
-          api.settings.getTelephony(),
-          api.settings.getObservability(),
-        ]);
+      const results = await Promise.allSettled([
+        api.settings.getLLM(),
+        api.settings.getVoiceLLM(),
+        api.settings.getNativeMultimodal(),
+        api.settings.getSTT(),
+        api.settings.getTTS(),
+        api.settings.getTelephony(),
+        api.settings.getObservability(),
+      ]);
+
+      const [llmRes, voiceLlmRes, nmRes, sttRes, ttsRes, telephonyRes, observabilityRes] = results;
+      let anySuccess = false;
 
       // Builder LLM
-      setBuilderLlm(llmRes);
-      setBuilderProviders(llmRes.supported_providers);
-      setBuilderProvider(llmRes.provider);
-      setBuilderModel(llmRes.model);
-      setBuilderBaseUrl(llmRes.base_url);
-      setBuilderTemperature(llmRes.temperature);
-      setBuilderApiKey("");
+      if (llmRes.status === "fulfilled") {
+        anySuccess = true;
+        setBuilderLlm(llmRes.value);
+        setBuilderProviders(llmRes.value.supported_providers);
+        setBuilderProvider(llmRes.value.provider);
+        setBuilderModel(llmRes.value.model);
+        setBuilderBaseUrl(llmRes.value.base_url);
+        setBuilderTemperature(llmRes.value.temperature);
+        setBuilderApiKey("");
+      }
 
       // Voice Agent LLM
-      setVoiceLlm(voiceLlmRes);
-      setVoiceProviders(voiceLlmRes.supported_providers);
-      setVoiceProvider(voiceLlmRes.provider);
-      setVoiceModel(voiceLlmRes.model);
-      setVoiceBaseUrl(voiceLlmRes.base_url);
-      setVoiceTemperature(voiceLlmRes.temperature);
-      setVoiceApiKey("");
+      if (voiceLlmRes.status === "fulfilled") {
+        anySuccess = true;
+        setVoiceLlm(voiceLlmRes.value);
+        setVoiceProviders(voiceLlmRes.value.supported_providers);
+        setVoiceProvider(voiceLlmRes.value.provider);
+        setVoiceModel(voiceLlmRes.value.model);
+        setVoiceBaseUrl(voiceLlmRes.value.base_url);
+        setVoiceTemperature(voiceLlmRes.value.temperature);
+        setVoiceApiKey("");
+      }
 
       // Native Multimodal
-      setNativeMultimodal(nmRes);
-      setNativeMultimodalProviders(nmRes.supported_providers);
-      setNativeMultimodalProvider(nmRes.provider);
-      setNativeMultimodalModel(nmRes.model);
-      setNativeMultimodalBaseUrl(nmRes.base_url);
-      setNativeMultimodalTemperature(nmRes.temperature);
-      setNativeMultimodalApiKey("");
+      if (nmRes.status === "fulfilled") {
+        anySuccess = true;
+        setNativeMultimodal(nmRes.value);
+        setNativeMultimodalProviders(nmRes.value.supported_providers);
+        setNativeMultimodalProvider(nmRes.value.provider);
+        setNativeMultimodalModel(nmRes.value.model);
+        setNativeMultimodalBaseUrl(nmRes.value.base_url);
+        setNativeMultimodalTemperature(nmRes.value.temperature);
+        setNativeMultimodalApiKey("");
+      }
 
       // STT
-      setSTT(sttRes);
-      setSTTProviders(sttRes.supported_providers);
-      setSTTProvider(sttRes.provider);
-      setSTTBaseUrl(sttRes.base_url);
-      setSTTConfig(sttRes.config);
+      if (sttRes.status === "fulfilled") {
+        anySuccess = true;
+        setSTT(sttRes.value);
+        setSTTProviders(sttRes.value.supported_providers);
+        setSTTProvider(sttRes.value.provider);
+        setSTTBaseUrl(sttRes.value.base_url);
+        setSTTConfig(sttRes.value.config);
+      }
 
       // TTS
-      setTTS(ttsRes);
-      setTTSProviders(ttsRes.supported_providers);
-      setTTSProvider(ttsRes.provider);
-      setTTSBaseUrl(ttsRes.base_url);
-      setTTSConfig(ttsRes.config);
+      if (ttsRes.status === "fulfilled") {
+        anySuccess = true;
+        setTTS(ttsRes.value);
+        setTTSProviders(ttsRes.value.supported_providers);
+        setTTSProvider(ttsRes.value.provider);
+        setTTSBaseUrl(ttsRes.value.base_url);
+        setTTSConfig(ttsRes.value.config);
+      }
 
       // Telephony
-      const initialUrl = telephonyRes.voice_server_url || DEFAULT_VOICE_SERVER_URL;
-      setVoiceServerUrl(initialUrl);
-      savedVoiceServerUrl.current = initialUrl;
+      if (telephonyRes.status === "fulfilled") {
+        anySuccess = true;
+        const initialUrl = telephonyRes.value.voice_server_url || DEFAULT_VOICE_SERVER_URL;
+        setVoiceServerUrl(initialUrl);
+        savedVoiceServerUrl.current = initialUrl;
+      }
 
       // Observability
-      setObservability(observabilityRes);
-      setDbEventsEnabled(observabilityRes.db_events_enabled);
-      setLangfuseEnabled(observabilityRes.langfuse_enabled);
-      setLangfuseBaseUrl(observabilityRes.langfuse_base_url || "https://cloud.langfuse.com");
-      setLangfusePublicKey("");
-      setLangfuseSecretKey("");
-      setLangfuseTracePublic(observabilityRes.langfuse_trace_public ?? false);
-      setQueueSize(observabilityRes.queue_size ?? OBS_DEFAULTS.queue_size);
-      setBatchSize(observabilityRes.batch_size ?? OBS_DEFAULTS.batch_size);
-      setFlushIntervalMs(observabilityRes.flush_interval_ms ?? OBS_DEFAULTS.flush_interval_ms);
-      setShutdownFlushTimeoutMs(
-        observabilityRes.shutdown_flush_timeout_ms ?? OBS_DEFAULTS.shutdown_flush_timeout_ms
-      );
-      setDropPolicy(observabilityRes.drop_policy ?? OBS_DEFAULTS.drop_policy);
+      if (observabilityRes.status === "fulfilled") {
+        anySuccess = true;
+        const obs = observabilityRes.value;
+        setObservability(obs);
+        setDbEventsEnabled(obs.db_events_enabled);
+        setLangfuseEnabled(obs.langfuse_enabled);
+        setLangfuseBaseUrl(obs.langfuse_base_url || "https://cloud.langfuse.com");
+        setLangfusePublicKey("");
+        setLangfuseSecretKey("");
+        setLangfuseTracePublic(obs.langfuse_trace_public ?? false);
+        setQueueSize(obs.queue_size ?? OBS_DEFAULTS.queue_size);
+        setBatchSize(obs.batch_size ?? OBS_DEFAULTS.batch_size);
+        setFlushIntervalMs(obs.flush_interval_ms ?? OBS_DEFAULTS.flush_interval_ms);
+        setShutdownFlushTimeoutMs(
+          obs.shutdown_flush_timeout_ms ?? OBS_DEFAULTS.shutdown_flush_timeout_ms
+        );
+        setDropPolicy(obs.drop_policy ?? OBS_DEFAULTS.drop_policy);
+      }
+
+      if (!anySuccess) {
+        setError("Could not load settings. Is the backend running?");
+      } else {
+        setError(null);
+      }
     } catch {
       setError("Could not load settings. Is the backend running?");
     } finally {
@@ -1496,7 +1526,7 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
         </div>
       </div>
 
-      {error && (
+      {error && activeTab !== "api-keys" && (
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-destructive/5 border border-destructive/10 text-destructive text-sm">
           <HugeiconsIcon icon={AlertCircleIcon} className="size-4 shrink-0" />
           {error}

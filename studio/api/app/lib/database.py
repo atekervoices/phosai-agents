@@ -17,6 +17,7 @@ engine = create_async_engine(
     _db_url,
     echo=settings.database.echo,
     pool_pre_ping=True,
+    pool_recycle=300,
     pool_size=settings.database.pool_size,
     max_overflow=settings.database.max_overflow,
     # Asyncpg attempts to cache prepared statements by default.
