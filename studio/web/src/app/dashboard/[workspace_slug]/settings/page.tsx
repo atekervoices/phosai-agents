@@ -153,6 +153,7 @@ const PROVIDER_HELP: Record<string, { models: string[]; docs: string; placeholde
 };
 
 import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
+import { BillingPanel } from "@/components/settings/billing-panel";
 
 const DEFAULT_VOICE_SERVER_URL = "http://127.0.0.1:8300";
 
@@ -161,6 +162,7 @@ const SETTINGS_TABS = [
   { id: "voice-infrastructure", label: "Voice Infrastructure" },
   { id: "observability", label: "Observability" },
   { id: "api-keys", label: "API Keys" },
+  { id: "billing", label: "Billing & Credits" },
 ] as const;
 
 type SettingsSectionId = (typeof SETTINGS_TABS)[number]["id"];
@@ -1526,7 +1528,7 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
         </div>
       </div>
 
-      {error && activeTab !== "api-keys" && (
+      {error && activeTab !== "api-keys" && activeTab !== "billing" && (
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-destructive/5 border border-destructive/10 text-destructive text-sm">
           <HugeiconsIcon icon={AlertCircleIcon} className="size-4 shrink-0" />
           {error}
@@ -2077,6 +2079,13 @@ function SettingsPageContent({ params }: { params: Promise<{ workspace_slug: str
       {activeTab === "api-keys" && (
         <div className="pt-2">
           <ApiKeysPanel />
+        </div>
+      )}
+
+      {/* ═══ SECTION 5: Billing & Platform Credits ═══ */}
+      {activeTab === "billing" && (
+        <div className="pt-2">
+          <BillingPanel />
         </div>
       )}
 

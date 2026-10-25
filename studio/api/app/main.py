@@ -16,6 +16,7 @@ from loguru import logger
 from app.api.admin import router as admin_router
 from app.api.agents import router as agents_router
 from app.api.api_keys import router as api_keys_router
+from app.api.billing import router as billing_router
 from app.api.builder import router as builder_router
 from app.api.calls import router as calls_router
 from app.api.credentials import router as credentials_router
@@ -113,6 +114,8 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(agents_router, prefix="/api", dependencies=_auth)
 app.include_router(api_keys_router, prefix="/api", dependencies=_auth)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_auth)
+app.include_router(billing_router, prefix="/api", dependencies=_auth)
+app.include_router(billing_router, prefix="/v1", dependencies=_auth)
 app.include_router(builder_router, prefix="/api", dependencies=_auth)
 app.include_router(calls_router, prefix="/api", dependencies=_auth)
 app.include_router(credentials_router, prefix="/api", dependencies=_auth)

@@ -1103,7 +1103,65 @@ export const api = {
         method: "DELETE",
       }),
   },
+
+  // Billing & Credits
+  billing: {
+    getWallet: () => apiFetch<WalletResponse>("/billing/wallet"),
+    getUsage: () => apiFetch<UsageSummaryResponse>("/billing/usage"),
+    getTransactions: (limit = 50) =>
+      apiFetch<TransactionItem[]>(`/billing/transactions?limit=${limit}`),
+    adjustCredits: (data: { organization_id: string; amount: number; description: string }) =>
+      apiFetch<WalletResponse>("/billing/admin/adjust", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
 };
+
+// ── Billing & Credits Types ─────────────────────────────────────
+
+export interface WalletResponse {
+  id: string;
+  organization_id: string;
+  balance_credits: number;
+  balance_usd: number;
+  lifetime_granted: number;
+  lifetime_consumed: number;
+  low_balance_threshold: number;
+  is_low_balance: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TransactionItem {
+  id: string;
+  amount: number;
+  amount_usd: number;
+  balance_after: number;
+  balance_after_usd: number;
+  transaction_type: string;
+  description: string | null;
+  granted_by_user_id: string | null;
+  created_at: string;
+}
+
+export interface ServiceUsageStats {
+  service_type: string;
+  total_units: number;
+  unit_type: string;
+  total_cost_credits: number;
+  total_cost_usd: number;
+  event_count: number;
+}
+
+export interface UsageSummaryResponse {
+  organization_id: string;
+  total_cost_credits: number;
+  total_cost_usd: number;
+  services: ServiceUsageStats[];
+  rate_card: Record<string, { rate: number; unit: string }>;
+}
 
 // ── API Key Types ───────────────────────────────────────────────
 

@@ -15,6 +15,13 @@ from app.models.phone_number import PhoneNumber
 from app.models.provider import ProviderConfig
 from app.models.api_key import APIKey, SecureAPIKeyEngine
 from app.models.knowledge import KnowledgeBase, KnowledgeDocument, KnowledgeChunk
+from app.models.billing import (
+    Wallet,
+    CreditTransaction,
+    UsageEvent,
+    BillingEngine,
+    RATE_CARD,
+)
 
 __all__ = [
     "APIKey",
@@ -38,4 +45,9 @@ __all__ = [
     "KnowledgeBase",
     "KnowledgeDocument",
     "KnowledgeChunk",
+    "Wallet",
+    "CreditTransaction",
+    "UsageEvent",
+    "BillingEngine",
+    "RATE_CARD",
 ]
