@@ -13,9 +13,9 @@ docs.atekervoices.com {
 # 2. Unified Speech & AI Public API Gateway
 # ==============================================================================
 api.atekervoices.com {
-    # Real-Time STT WebSocket & Batch Transcription -> Remote STT Cluster
-    @stt path /v1/realtime* /v1/audio/transcriptions*
-    handle @stt {
+    # Real-Time Streaming Audio WebSocket -> Remote STT Cluster
+    @realtime path /v1/realtime*
+    handle @realtime {
         reverse_proxy https://stt-staging.atekervoices.com {
             header_up Host stt-staging.atekervoices.com
             transport http {
@@ -25,33 +25,14 @@ api.atekervoices.com {
         }
     }
 
-    # Text-to-Speech Engine -> Remote TTS Cluster
-    @tts path /v1/speech* /v1/audio/speech*
-    handle @tts {
-        reverse_proxy https://tts.atekervoices.com {
-            header_up Host tts.atekervoices.com
-            transport http {
-                tls
-                tls_server_name tts.atekervoices.com
-            }
-        }
+    # Unified Metered AI Gateway (STT, TTS, Translation, API Keys, Billing) -> Studio API
+    @gateway path /v1/transcribe* /v1/audio/transcriptions* /v1/audio/speech* /v1/translate* /translate* /v1/api-keys* /v1/billing* /api/*
+    handle @gateway {
+        reverse_proxy studio-api:8000
     }
 
-    # Neural Translation -> Remote Translation Cluster
-    @translate path /v1/translate*
-    handle @translate {
-        reverse_proxy https://translate.atekervoices.com {
-            header_up Host translate.atekervoices.com
-            transport http {
-                tls
-                tls_server_name translate.atekervoices.com
-            }
-        }
-    }
-
-    # API Key Management & Control Plane -> Local FastAPI
-    @control_plane path /v1/api-keys* /api/*
-    handle @control_plane {
+    # Default fallback
+    handle {
         reverse_proxy studio-api:8000
     }
 }

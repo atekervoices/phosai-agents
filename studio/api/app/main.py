@@ -27,6 +27,9 @@ from app.api.oauth import router as oauth_router
 from app.api.oauth_apps import router as oauth_apps_router
 from app.api.phone_numbers import router as phone_numbers_router
 from app.api.settings import router as settings_router
+from app.api.stt_gateway import public_router as stt_public_router, router as stt_router
+from app.api.translation_gateway import public_router as translation_public_router, router as translation_router
+from app.api.tts_gateway import public_router as tts_public_router, router as tts_router
 from app.api.voice_session import router as voice_router
 from app.lib import get_settings
 from app.lib.auth import require_api_key
@@ -93,17 +96,29 @@ app = FastAPI(
 
 # ── CORS — driven by settings ────────────────────────────────────
 settings = get_settings()
+_cors_origins = list(settings.allowed_origins)
+for _origin in [
+    "http://localhost:7970",
+    "http://127.0.0.1:7970",
+    "https://docs.atekervoices.com",
+    "https://docs.phosaico.com",
+]:
+    if _origin not in _cors_origins:
+        _cors_origins.append(_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-        "X-API-Key",
-        "Idempotency-Key",
-        "X-Workspace-Id",
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=[
+        "X-Units-Metered",
+        "X-Credits-Deducted",
+        "X-Credits-Remaining",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
     ],
 )
 
@@ -112,9 +127,9 @@ _auth = [Depends(require_api_key)]
 
 app.include_router(admin_router, prefix="/api")
 app.include_router(agents_router, prefix="/api", dependencies=_auth)
-app.include_router(api_keys_router, prefix="/api", dependencies=_auth)
+app.include_router(api_keys_router, prefix="/api", dependencies=_auth, include_in_schema=False)
 app.include_router(api_keys_router, prefix="/v1", dependencies=_auth)
-app.include_router(billing_router, prefix="/api", dependencies=_auth)
+app.include_router(billing_router, prefix="/api", dependencies=_auth, include_in_schema=False)
 app.include_router(billing_router, prefix="/v1", dependencies=_auth)
 app.include_router(builder_router, prefix="/api", dependencies=_auth)
 app.include_router(calls_router, prefix="/api", dependencies=_auth)
@@ -128,6 +143,25 @@ app.include_router(phone_numbers_router, prefix="/api", dependencies=_auth)
 app.include_router(oauth_router, prefix="/api")
 app.include_router(oauth_apps_router, prefix="/api", dependencies=_auth)
 app.include_router(knowledge_router, prefix="/api")
+
+# ── Speech-to-Text & Neural Translation Gateway (API Key & Credit Enforcement) ──
+app.include_router(stt_public_router, prefix="/v1")
+app.include_router(stt_public_router, prefix="/api", include_in_schema=False)
+app.include_router(stt_router, prefix="/v1", dependencies=_auth)
+app.include_router(stt_router, prefix="/api", dependencies=_auth, include_in_schema=False)
+
+app.include_router(translation_public_router, prefix="/v1")
+app.include_router(translation_public_router, prefix="/api", include_in_schema=False)
+app.include_router(translation_public_router, include_in_schema=False)
+app.include_router(translation_router, prefix="/v1", dependencies=_auth)
+app.include_router(translation_router, prefix="/api", dependencies=_auth, include_in_schema=False)
+app.include_router(translation_router, dependencies=_auth, include_in_schema=False)
+
+# ── Text-to-Speech Gateway (API Key & Credit Enforcement) ──
+app.include_router(tts_public_router, prefix="/v1")
+app.include_router(tts_public_router, prefix="/api", include_in_schema=False)
+app.include_router(tts_router, prefix="/v1", dependencies=_auth)
+app.include_router(tts_router, prefix="/api", dependencies=_auth, include_in_schema=False)
 
 # ── WebSocket routes (auth handled inside the handler via query params,
 #    because browsers cannot send custom HTTP headers on WS upgrades) ──

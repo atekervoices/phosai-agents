@@ -28,6 +28,7 @@ RATE_CARD = {
     # 0.1 credits per audio second = 6.0 credits / min = $0.006 / min
     "stt_streaming": {"rate": 0.1, "unit": "seconds"},
     # 0.08 credits per audio second = 4.8 credits / min = $0.0048 / min
+    "stt": {"rate": 0.08, "unit": "seconds"},
     "stt_batch": {"rate": 0.08, "unit": "seconds"},
     # 15.0 credits per 1,000 characters = $0.015 / 1k chars
     "tts_synthesis": {"rate": 0.015, "unit": "characters"},
@@ -208,12 +209,18 @@ class BillingEngine:
         session: AsyncSession,
         organization_id: str,
         service_type: str,
-        endpoint: str,
-        units: float,
+        endpoint: str = "",
+        units: float = 0.0,
         api_key_id: uuid.UUID | None = None,
         metadata: dict[str, Any] | None = None,
+        custom_description: str | None = None,
+        **kwargs: Any,
     ) -> float:
         """Atomically calculate unit cost, deduct credits, and append audit records."""
+        # Support fallback keyword argument units_consumed if provided
+        if units == 0.0 and "units_consumed" in kwargs:
+            units = float(kwargs["units_consumed"])
+
         rate_info = RATE_CARD.get(service_type, {"rate": 0.1, "unit": "units"})
         unit_cost = rate_info["rate"]
         unit_name = rate_info["unit"]
@@ -246,13 +253,17 @@ class BillingEngine:
             float(wallet.lifetime_consumed) + total_cost, 4
         )
 
+        # Format units cleanly (e.g. 6.70 instead of 6.6978125)
+        formatted_units = f"{round(units, 2):.2f}" if isinstance(units, (int, float)) else str(units)
+        tx_desc = custom_description or f"{service_type.upper()} usage: {formatted_units} {unit_name}"
+
         # 1. Append to credit transactions ledger
         tx = CreditTransaction(
             wallet_id=wallet.id,
             amount=-total_cost,
             balance_after=new_balance,
             transaction_type="deduction",
-            description=f"{service_type.upper()} usage: {units} {unit_name}",
+            description=tx_desc,
         )
         session.add(tx)
 

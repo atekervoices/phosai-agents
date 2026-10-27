@@ -268,7 +268,7 @@ export function BillingPanel() {
           <div className="p-4 rounded-xl border border-border/70 bg-card/60 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="size-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <HugeiconsIcon icon={VolumeHighIcon} className="size-4" />
                 </div>
                 <span className="text-sm font-medium">Text-to-Speech</span>
@@ -292,7 +292,7 @@ export function BillingPanel() {
           <div className="p-4 rounded-xl border border-border/70 bg-card/60 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="size-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <HugeiconsIcon icon={AiVoiceIcon} className="size-4" />
                 </div>
                 <span className="text-sm font-medium">Neural Translation</span>
@@ -338,16 +338,30 @@ export function BillingPanel() {
                     <th className="py-2.5 px-4 font-medium">Date & Time</th>
                     <th className="py-2.5 px-4 font-medium">Type</th>
                     <th className="py-2.5 px-4 font-medium">Description</th>
-                    <th className="py-2.5 px-4 font-medium text-right">Amount</th>
+                    <th className="py-2.5 px-4 font-medium text-right">Credits</th>
+                    <th className="py-2.5 px-4 font-medium text-right">Amount (USD)</th>
                     <th className="py-2.5 px-4 font-medium text-right">Balance After</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {transactions.map((tx) => {
                     const isGrant = tx.amount > 0;
+                    const absUsd = Math.abs(tx.amount_usd);
+                    const usdText =
+                      absUsd === 0
+                        ? "$0.00"
+                        : absUsd < 0.01
+                        ? `${isGrant ? "+$" : "-$"}${absUsd.toFixed(4)}`
+                        : `${isGrant ? "+$" : "-$"}${absUsd.toFixed(2)}`;
+
+                    const displayDesc = (tx.description || "Credit update").replace(
+                      /(\d+\.\d{3,})\s*(seconds|chars|words|units)/g,
+                      (_, num, unit) => `${parseFloat(num).toFixed(2)} ${unit}`
+                    );
+
                     return (
                       <tr key={tx.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 font-mono text-muted-foreground">
+                        <td className="py-3 px-4 font-mono text-muted-foreground whitespace-nowrap">
                           {new Date(tx.created_at).toLocaleString([], {
                             month: "short",
                             day: "numeric",
@@ -363,8 +377,11 @@ export function BillingPanel() {
                             {tx.transaction_type.replace("_", " ")}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4 text-foreground/90 max-w-xs truncate">
-                          {tx.description || "Credit update"}
+                        <td
+                          className="py-3 px-4 text-foreground/90 max-w-xs truncate"
+                          title={tx.description || undefined}
+                        >
+                          {displayDesc}
                         </td>
                         <td
                           className={`py-3 px-4 text-right font-mono font-medium ${
@@ -372,10 +389,20 @@ export function BillingPanel() {
                           }`}
                         >
                           {isGrant ? "+" : ""}
-                          {tx.amount.toLocaleString()} ({isGrant ? "+$" : "-$"}
-                          {Math.abs(tx.amount_usd).toFixed(2)})
+                          {tx.amount.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-medium text-foreground">
+                        <td
+                          className={`py-3 px-4 text-right font-mono font-medium ${
+                            isGrant ? "text-emerald-500" : "text-muted-foreground"
+                          }`}
+                          title={`$${absUsd.toFixed(6)} USD`}
+                        >
+                          {usdText}
+                        </td>
+                        <td
+                          className="py-3 px-4 text-right font-mono font-medium text-foreground"
+                          title={`${tx.balance_after.toLocaleString()} credits`}
+                        >
                           ${tx.balance_after_usd.toFixed(2)}
                         </td>
                       </tr>

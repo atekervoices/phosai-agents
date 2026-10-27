@@ -244,7 +244,7 @@ class Settings(BaseSettings):
             o.strip()
             for o in os.getenv(
                 "ALLOWED_ORIGINS",
-                "http://localhost:3000,http://127.0.0.1:3000,http://studio-web:3000,https://agents.phosaico.com,https://studio.phosaico.com,https://api.phosaico.com,https://voice.phosaico.com",
+                "http://localhost:3000,http://127.0.0.1:3000,http://localhost:7970,http://127.0.0.1:7970,http://studio-web:3000,https://agents.phosaico.com,https://studio.phosaico.com,https://api.phosaico.com,https://docs.atekervoices.com,https://voice.phosaico.com",
             ).split(",")
             if o.strip()
         ]
