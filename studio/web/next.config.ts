@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
+    cpus: 4,
     optimizePackageImports: [
       "@hugeicons/react",
       "@hugeicons/core-free-icons",
