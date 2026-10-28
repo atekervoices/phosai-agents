@@ -702,6 +702,12 @@ export default function ManualTestView({
           host = `${typeof window !== "undefined" ? window.location.hostname : "127.0.0.1"}:${parsed.port || "8300"}`;
         }
 
+        // On remote HTTPS pages (e.g. https://www.atekervoices.com), if host resolved to localhost or 127.0.0.1,
+        // use window.location.host so Caddy proxies /ws/* directly with valid SSL to voice-server:8300
+        if (isHttpsPage && (host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.startsWith("voice-server"))) {
+          host = typeof window !== "undefined" ? window.location.host : host;
+        }
+
         resolvedWsUrl = `${wsProto}//${host}${parsed.pathname}${parsed.search}`;
       } catch {
         if (isHttpsPage && resolvedWsUrl.startsWith("ws://")) {

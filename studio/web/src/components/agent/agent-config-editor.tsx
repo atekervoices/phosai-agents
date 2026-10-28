@@ -303,7 +303,12 @@ export default function AgentConfigEditor({
       .catch(() => {});
     api.agents
       .getLanguages()
-      .then((langs) => setLanguageOptions(langs.map((l) => ({ value: l.code, label: l.label }))))
+      .then((langs) => {
+        const unique = Array.from(
+          new Map(langs.map((l) => [l.code, { value: l.code, label: l.label }])).values()
+        );
+        setLanguageOptions(unique);
+      })
       .catch(() => {}); // keep fallback list on error
     // Fetch TTS model catalog for language→voice suggestions
     api.agents
@@ -1260,13 +1265,13 @@ function SelectField({
             <SelectValue>{options.find((o) => o.value === value)?.label ?? value}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {options
-              .filter((o) => o.value !== "")
-              .map((o) => (
-                <SelectItem key={o.value} value={o.value} className="text-xs font-semibold">
-                  {o.label}
-                </SelectItem>
-              ))}
+            {Array.from(
+              new Map(options.filter((o) => o.value !== "").map((o) => [o.value, o])).values()
+            ).map((o) => (
+              <SelectItem key={o.value} value={o.value} className="text-xs font-semibold">
+                {o.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
