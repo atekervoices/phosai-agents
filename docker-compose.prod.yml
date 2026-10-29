@@ -77,6 +77,11 @@ services:
       TTS_MODEL: ${TTS_MODEL:-spark-tts}
       TTS_VOICE_ID: ${TTS_VOICE_ID:-pcm_female_1}
       RECORDING__OUTPUT_URI: "file:///recordings"
+      CF__TURN_KEY_ID: ${CF_TURN_KEY_ID:-${CF__TURN_KEY_ID:-}}
+      CF__TURN_KEY_API_TOKEN: ${CF_TURN_KEY_API_TOKEN:-${CF__TURN_KEY_API_TOKEN:-}}
+      TURN__URLS: ${TURN_URLS:-${TURN__URLS:-}}
+      TURN__USERNAME: ${TURN_USERNAME:-${TURN__USERNAME:-}}
+      TURN__CREDENTIAL: ${TURN_CREDENTIAL:-${TURN__CREDENTIAL:-}}
     volumes:
       - recordings:/recordings
     depends_on:
