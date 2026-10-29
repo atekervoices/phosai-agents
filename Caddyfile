@@ -40,7 +40,7 @@ api.atekervoices.com {
 # ==============================================================================
 # 3. Studio Web Dashboard & Voice Agent OS
 # ==============================================================================
-http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
+atekervoices.com, www.atekervoices.com, http://agents.phosaico.com, https://agents.phosaico.com, :80, :443 {
     # 1. Rust Voice Server: WebSockets, WebRTC signaling & session endpoints
     @voice path /ws/* /voice/* /rtc/* /telephony/*
     handle @voice {
