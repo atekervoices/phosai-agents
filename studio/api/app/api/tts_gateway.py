@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import os
 from typing import Any
+import wave
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from loguru import logger
@@ -25,6 +27,37 @@ def _get_tts_backend_url() -> str:
     return "https://tts.atekervoices.com"
 
 
+def _pcm_to_wav(pcm_bytes: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2) -> bytes:
+    """Wrap raw Linear PCM audio bytes in a standard RIFF WAV container."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_bytes)
+    return buffer.getvalue()
+
+
+VOICE_CATALOG = [
+    # Nigerian Pidgin
+    {"id": "pcm_female_1", "name": "Amara", "language": "pcm", "language_name": "Nigerian Pidgin", "gender": "female", "accent": "West African / Lagos"},
+    {"id": "pcm_female_2", "name": "Blessing", "language": "pcm", "language_name": "Nigerian Pidgin", "gender": "female", "accent": "West African / Lagos"},
+    {"id": "pcm_male_1", "name": "Chidi", "language": "pcm", "language_name": "Nigerian Pidgin", "gender": "male", "accent": "West African / Lagos"},
+    {"id": "pcm_male_2", "name": "Emeka", "language": "pcm", "language_name": "Nigerian Pidgin", "gender": "male", "accent": "West African / Lagos"},
+    # Swahili
+    {"id": "swa_female_1", "name": "Amina", "language": "swa", "language_name": "Swahili", "gender": "female", "accent": "East African / Standard"},
+    {"id": "swa_female_2", "name": "Zuri", "language": "swa", "language_name": "Swahili", "gender": "female", "accent": "East African / Nairobi"},
+    {"id": "swa_male_3", "name": "Juma", "language": "swa", "language_name": "Swahili", "gender": "male", "accent": "East African / Standard"},
+    # Luganda
+    {"id": "lug_female_4", "name": "Namubiru", "language": "lug", "language_name": "Luganda", "gender": "female", "accent": "Ugandan / Central"},
+    {"id": "lug_female_7", "name": "Babirye", "language": "lug", "language_name": "Luganda", "gender": "female", "accent": "Ugandan / Central"},
+    {"id": "lug_male_1", "name": "Kato", "language": "lug", "language_name": "Luganda", "gender": "male", "accent": "Ugandan / Central"},
+    # English
+    {"id": "eng_female_1", "name": "Sarah", "language": "eng", "language_name": "English", "gender": "female", "accent": "International / Neutral"},
+    {"id": "eng_male_1", "name": "David", "language": "eng", "language_name": "English", "gender": "male", "accent": "International / Neutral"},
+]
+
+
 @public_router.get("/tts/health", include_in_schema=False)
 async def tts_health() -> dict[str, Any]:
     """Check health of the upstream TTS service."""
@@ -32,15 +65,22 @@ async def tts_health() -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
-                f"{backend_url}/health",
+                f"{backend_url}/openapi.json",
                 headers={"User-Agent": "PhosAI-Gateway/1.0"},
             )
             if resp.status_code == 200:
-                return resp.json()
+                return {"status": "healthy", "service": "spark-tts", "upstream_url": backend_url}
             return {"status": "degraded", "upstream_code": resp.status_code, "upstream_url": backend_url}
     except Exception as exc:
         logger.warning(f"TTS health check failed at {backend_url}: {exc}")
         return {"status": "unreachable", "error": str(exc), "upstream_url": backend_url}
+
+
+@public_router.get("/voices", summary="List Available Voices")
+@router.get("/voices", summary="List Available Voices")
+async def list_voices() -> dict[str, Any]:
+    """Return all supported voice models grouped by language and gender."""
+    return {"voices": VOICE_CATALOG}
 
 
 @router.post("/audio/speech", summary="Synthesize Speech")
@@ -54,7 +94,7 @@ async def synthesize_speech(
     
     Accepts JSON body:
       - text or input: Text string to synthesize
-      - voice: Voice ID (e.g. pcm_female_1, swa_female_1, eng_female_1)
+      - voice: Voice ID (e.g. pcm_female_1, swa_female_1, lug_female_4, eng_female_1)
       - speed: Playback speed (default: 1.0)
       - response_format: 'wav', 'mp3', or 'pcm' (default: 'wav')
     
@@ -97,15 +137,25 @@ async def synthesize_speech(
             detail="Field 'text' or 'input' must not be empty.",
         )
 
+    voice = body.get("voice") or "pcm_female_1"
+    response_format = (body.get("response_format") or "wav").lower()
+    temperature = float(body.get("temperature", 0.7))
     char_count = len(text)
     backend_url = _get_tts_backend_url()
 
-    # 4. Proxy request to upstream TTS engine
+    # 4. Proxy request to upstream Spark-TTS engine
+    upstream_payload = {
+        "input": text,
+        "voice": voice,
+        "temperature": temperature,
+        "stream": False,
+    }
+
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             upstream_resp = await client.post(
-                f"{backend_url}/v1/tts",
-                json=body,
+                f"{backend_url}/v1/audio/speech/stream",
+                json=upstream_payload,
                 headers={
                     "Content-Type": "application/json",
                     "User-Agent": "PhosAI-Gateway/1.0",
@@ -142,7 +192,18 @@ async def synthesize_speech(
 
         raise HTTPException(status_code=upstream_resp.status_code, detail=detail)
 
-    # 5. Deduct usage on successful synthesis
+    raw_pcm = upstream_resp.content
+
+    # 5. Package audio format (wrap PCM in WAV header unless raw PCM is requested)
+    if response_format == "pcm":
+        audio_content = raw_pcm
+        media_type = "audio/pcm"
+    else:
+        # Default or wav/mp3 fallback -> standard 16kHz 16-bit mono WAV
+        audio_content = _pcm_to_wav(raw_pcm, sample_rate=16000, channels=1, sample_width=2)
+        media_type = "audio/wav"
+
+    # 6. Deduct usage on successful synthesis
     try:
         rate = RATE_CARD.get("tts_synthesis", {}).get("rate", 0.015)
         deducted = round(float(char_count) * rate, 4)
@@ -150,11 +211,11 @@ async def synthesize_speech(
             session=db,
             organization_id=org_id,
             service_type="tts_synthesis",
-            endpoint="/v1/tts/synthesize",
+            endpoint="/v1/audio/speech",
             units=float(char_count),
             metadata={
                 "chars": char_count,
-                "voice": body.get("voice"),
+                "voice": voice,
                 "api_key_id": str(api_key_id) if api_key_id else None,
             },
             api_key_id=api_key_id,
@@ -165,6 +226,6 @@ async def synthesize_speech(
     except Exception as exc:
         logger.error(f"Failed to record TTS usage deduction: {exc}")
 
-    # 6. Stream back audio response
-    content_type = upstream_resp.headers.get("content-type", "audio/wav")
-    return Response(content=upstream_resp.content, media_type=content_type, headers=dict(response.headers))
+    # 7. Stream back audio response
+    return Response(content=audio_content, media_type=media_type, headers=dict(response.headers))
+
