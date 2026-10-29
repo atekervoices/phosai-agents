@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
+import json
 import os
+import ssl
 from typing import Any
 import wave
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from loguru import logger
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import websockets
 
+from app.lib import get_settings
 from app.lib.auth import require_api_key
-from app.lib.database import get_db
+from app.lib.database import async_session, get_db
+from app.models.api_key import APIKey, SecureAPIKeyEngine
 from app.models.billing import BillingEngine, RATE_CARD
 
 router = APIRouter(tags=["Text to Speech"])
@@ -228,4 +235,189 @@ async def synthesize_speech(
 
     # 7. Stream back audio response
     return Response(content=audio_content, media_type=media_type, headers=dict(response.headers))
+
+
+@public_router.websocket("/audio/speech/stream/ws")
+async def tts_streaming_ws(websocket: WebSocket) -> None:
+    """Real-time streaming TTS WebSocket proxy with sk-phos- authentication and credit metering.
+    
+    Compatible with:
+      - wss://api.atekervoices.com/v1/audio/speech/stream/ws
+      - ws://localhost:8000/v1/audio/speech/stream/ws
+    """
+    settings = get_settings()
+
+    # 1. Extract API key from query params or headers
+    api_key = websocket.query_params.get("api_key")
+    if not api_key:
+        auth_hdr = websocket.headers.get("authorization") or websocket.headers.get("x-api-key")
+        if auth_hdr:
+            if auth_hdr.startswith("Bearer "):
+                api_key = auth_hdr.split(" ", 1)[1].strip()
+            else:
+                api_key = auth_hdr.strip()
+
+    org_id = "default"
+    api_key_record: APIKey | None = None
+
+    # 2. Authenticate API key
+    if api_key and api_key.startswith(SecureAPIKeyEngine.PREFIX):
+        parts = api_key.split("_", 1)
+        if len(parts) == 2:
+            prefix = parts[0]
+            async with async_session() as session:
+                query = select(APIKey).where(
+                    APIKey.key_prefix == prefix,
+                    APIKey.is_active == True,
+                )
+                res = await session.execute(query)
+                candidates = res.scalars().all()
+                for rec in candidates:
+                    if SecureAPIKeyEngine.verify(api_key, rec.hashed_key):
+                        api_key_record = rec
+                        org_id = rec.organization_id or "default"
+                        break
+
+    # If key was provided but invalid
+    if api_key and not api_key_record:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid or revoked API key")
+        return
+
+    # If no key was provided in non-dev environment
+    if not api_key_record and not settings.is_development:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Missing API key. Provide via ?api_key=sk-phos- or Authorization header",
+        )
+        return
+
+    # 3. Verify scope permission
+    if api_key_record and hasattr(api_key_record, "scopes") and api_key_record.scopes:
+        if "tts" not in api_key_record.scopes:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason="API key does not have the 'tts' scope enabled",
+            )
+            return
+
+    # 4. Check wallet credit balance
+    async with async_session() as session:
+        has_credits, balance = await BillingEngine.check_balance(session, org_id)
+        if not has_credits or balance <= 0:
+            await websocket.close(
+                code=status.WS_1008_POLICY_VIOLATION,
+                reason=f"Insufficient platform credits (Balance: {balance:.2f}). Please top up wallet.",
+            )
+            return
+
+    # 5. Accept client WebSocket connection
+    await websocket.accept()
+
+    # 6. Build upstream WebSocket URL
+    backend_url = _get_tts_backend_url()
+    ws_base = backend_url.replace("https://", "wss://").replace("http://", "ws://")
+    upstream_url = f"{ws_base}/v1/audio/speech/stream/ws"
+    
+    # Forward query parameters (such as default voice or sample rate)
+    q_params = dict(websocket.query_params)
+    q_params.pop("api_key", None)
+    if q_params:
+        query_str = "&".join(f"{k}={v}" for k, v in q_params.items())
+        upstream_url = f"{upstream_url}?{query_str}"
+
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    accumulated_chars = 0
+
+    try:
+        async with websockets.connect(
+            upstream_url,
+            ssl=ssl_ctx if upstream_url.startswith("wss://") else None,
+            ping_interval=20,
+            ping_timeout=20,
+        ) as upstream_ws:
+
+            async def client_to_upstream() -> None:
+                nonlocal accumulated_chars
+                try:
+                    while True:
+                        msg = await websocket.receive()
+                        if "text" in msg:
+                            text_data = msg["text"]
+                            try:
+                                parsed = json.loads(text_data)
+                                text_input = parsed.get("input") or parsed.get("text") or ""
+                                if text_input:
+                                    accumulated_chars += len(text_input)
+                            except Exception:
+                                pass
+                            await upstream_ws.send(text_data)
+                        elif "bytes" in msg:
+                            await upstream_ws.send(msg["bytes"])
+                        elif msg.get("type") == "websocket.disconnect":
+                            break
+                except (WebSocketDisconnect, asyncio.CancelledError):
+                    pass
+                except Exception as exc:
+                    logger.debug(f"TTS WS client_to_upstream finished: {exc}")
+
+            async def upstream_to_client() -> None:
+                try:
+                    while True:
+                        resp = await upstream_ws.recv()
+                        if isinstance(resp, bytes):
+                            await websocket.send_bytes(resp)
+                        elif isinstance(resp, str):
+                            await websocket.send_text(resp)
+                except (websockets.ConnectionClosed, asyncio.CancelledError):
+                    pass
+                except Exception as exc:
+                    logger.debug(f"TTS WS upstream_to_client finished: {exc}")
+
+            # Run client and upstream loops concurrently
+            c2u_task = asyncio.create_task(client_to_upstream())
+            u2c_task = asyncio.create_task(upstream_to_client())
+
+            done, pending = await asyncio.wait(
+                [c2u_task, u2c_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+
+    except Exception as exc:
+        logger.error(f"TTS WebSocket proxy error: {exc}")
+        try:
+            await websocket.close(
+                code=status.WS_1011_INTERNAL_ERROR,
+                reason="TTS upstream synthesis engine unreachable",
+            )
+        except Exception:
+            pass
+
+    # 7. Deduct credits for accumulated character count
+    if accumulated_chars > 0:
+        try:
+            async with async_session() as session:
+                rate = RATE_CARD.get("tts_synthesis", {}).get("rate", 0.015)
+                await BillingEngine.deduct_usage(
+                    session=session,
+                    organization_id=org_id,
+                    service_type="tts_synthesis",
+                    endpoint="/v1/audio/speech/stream/ws",
+                    units=float(accumulated_chars),
+                    metadata={
+                        "chars": accumulated_chars,
+                        "protocol": "websocket",
+                        "api_key_id": str(api_key_record.id) if api_key_record else None,
+                    },
+                    api_key_id=api_key_record.id if api_key_record else None,
+                )
+                logger.info(
+                    f"Deducted {accumulated_chars * rate:.4f} credits for {accumulated_chars} chars on WS stream (org: {org_id})"
+                )
+        except Exception as exc:
+            logger.error(f"Failed to record WS TTS usage deduction: {exc}")
 
